@@ -1,4 +1,5 @@
 generate_interop_data
+performance
 test_avro_data
 test_avro_schema
 test_avro_schema_names
