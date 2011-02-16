@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "avro/allocation.h"
 #include "avro/data.h"
-#include "allocation.h"
 #include "avro_errors.h"
 
 

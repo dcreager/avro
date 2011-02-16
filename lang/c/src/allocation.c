@@ -19,7 +19,7 @@
 
 #include "avro.h"
 #include "avro_private.h"
-#include "allocation.h"
+#include "avro/allocation.h"
 
 static void *
 avro_default_allocator(void *ud, void *ptr, size_t osize, size_t nsize)
@@ -35,7 +35,7 @@ avro_default_allocator(void *ud, void *ptr, size_t osize, size_t nsize)
 	}
 }
 
-struct allocator_state  AVRO_CURRENT_ALLOCATOR = {
+struct avro_allocator_state  AVRO_CURRENT_ALLOCATOR = {
 	avro_default_allocator,
 	NULL
 };

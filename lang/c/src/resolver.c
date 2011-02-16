@@ -20,10 +20,10 @@
 #include <string.h>
 
 #include "avro.h"
+#include "avro/allocation.h"
 #include "avro/consumer.h"
 #include "avro_errors.h"
 #include "avro_private.h"
-#include "allocation.h"
 #include "st.h"
 
 

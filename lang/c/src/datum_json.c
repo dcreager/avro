@@ -22,7 +22,7 @@
 #include "avro.h"
 #include "avro_errors.h"
 #include "avro_private.h"
-#include "allocation.h"
+#include "avro/allocation.h"
 #include "datum.h"
 #include "jansson.h"
 

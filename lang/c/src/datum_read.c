@@ -17,8 +17,8 @@
 
 #include "avro_errors.h"
 #include "avro_private.h"
+#include "avro/allocation.h"
 #include "avro/consumer.h"
-#include "allocation.h"
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>

@@ -17,7 +17,7 @@
 
 #include "avro_errors.h"
 #include "avro_private.h"
-#include "allocation.h"
+#include "avro/allocation.h"
 #include "encoding.h"
 #include <stdio.h>
 #include <stdlib.h>

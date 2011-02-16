@@ -15,10 +15,10 @@
  * permissions and limitations under the License. 
  */
 
+#include "avro/allocation.h"
 #include "avro/refcount.h"
 #include "avro_errors.h"
 #include "avro_private.h"
-#include "allocation.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>

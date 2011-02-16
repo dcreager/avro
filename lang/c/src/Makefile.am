@@ -7,6 +7,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = avro-c.pc
 
 nobase_include_HEADERS = avro.h \
+avro/allocation.h \
 avro/consumer.h \
 avro/data.h \
 avro/refcount.h
@@ -18,7 +19,7 @@ datum_json.c \
 array.c map.c string.c \
 consumer.c resolver.c \
 io.c dump.c dump.h encoding_binary.c \
-allocation.h allocation.c \
+allocation.c \
 avro_private.h encoding.h datafile.c \
 avro_errors.h errors.c
 libavro_la_LIBADD = $(top_builddir)/jansson/src/.libs/libjansson.a

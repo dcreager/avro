@@ -20,12 +20,12 @@
 #include <stdlib.h>
 #include "avro.h"
 
-struct allocator_state {
+struct avro_allocator_state {
 	avro_allocator_t  alloc;
 	void  *user_data;
 };
 
-extern struct allocator_state  AVRO_CURRENT_ALLOCATOR;
+extern struct avro_allocator_state  AVRO_CURRENT_ALLOCATOR;
 
 #define avro_realloc(ptr, osz, nsz)          \
 	(AVRO_CURRENT_ALLOCATOR.alloc        \
