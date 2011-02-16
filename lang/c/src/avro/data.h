@@ -144,5 +144,101 @@ int avro_raw_map_get_or_create(avro_raw_map_t *map, const char *key,
 			       void **element, unsigned int *index);
 
 
+/*---------------------------------------------------------------------
+ * Strings
+ */
+
+/**
+ * A function used to free the contents of an avro_raw_string_t
+ * instance.
+ */
+
+typedef void
+(*avro_free_func_t)(void *ptr, size_t sz);
+
+/**
+ * An avro_free_func_t that frees the buffer using the custom allocator
+ * provided to avro_set_allocator.
+ */
+
+void
+avro_alloc_free(void *ptr, size_t sz);
+
+/**
+ * A resizable buffer for storing strings and bytes values.
+ */
+
+typedef struct avro_raw_string {
+	size_t  size;
+	size_t  allocated_size;
+	void  *buf;
+	avro_free_func_t  free;
+	int  our_buf;
+} avro_raw_string_t;
+
+/**
+ * Initializes an avro_raw_string_t that you've allocated yourself.
+ */
+
+void avro_raw_string_init(avro_raw_string_t *str);
+
+/**
+ * Finalizes an avro_raw_string_t.
+ */
+
+void avro_raw_string_done(avro_raw_string_t *str);
+
+/**
+ * Returns the length of the data stored in an avro_raw_string_t.  If
+ * the buffer contains a C string, this length includes the NUL
+ * terminator.
+ */
+
+#define avro_raw_string_length(str)  ((str)->size)
+
+/**
+ * Returns a pointer to the data stored in an avro_raw_string_t.
+ */
+
+#define avro_raw_string_get(str)  ((str)->buf)
+
+/**
+ * Fills an avro_raw_string_t with a copy of the given buffer.
+ */
+
+void avro_raw_string_set_length(avro_raw_string_t *str,
+				const void *src,
+				size_t length);
+
+/**
+ * Fills an avro_raw_string_t with a copy of the given C string.
+ */
+
+void avro_raw_string_set(avro_raw_string_t *str, const char *src);
+
+/**
+ * Gives control of a buffer to an avro_raw_string_t.
+ */
+
+void avro_raw_string_give_length(avro_raw_string_t *str,
+				 void *src,
+				 size_t length,
+				 avro_free_func_t free);
+
+/**
+ * Gives control of a C string to an avro_raw_string_t.
+ */
+
+void avro_raw_string_give(avro_raw_string_t *str,
+			  char *src,
+			  avro_free_func_t free);
+
+/**
+ * Clears an avro_raw_string_t.
+ */
+
+void avro_raw_string_clear(avro_raw_string_t *str);
+
+
 CLOSE_EXTERN
 #endif

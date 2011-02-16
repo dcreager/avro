@@ -26,6 +26,8 @@ extern "C" {
 #include <stdio.h>
 #include <stdint.h>
 
+#include <avro/data.h>
+
 /*
  * Allocation interface.  You can provide a custom allocator for the
  * library, should you wish.  The allocator is provided as a single
@@ -220,24 +222,8 @@ void avro_reader_free(avro_reader_t reader);
 void avro_writer_free(avro_writer_t writer);
 
 /*
- * datum 
+ * datum
  */
-
-/**
- * A function used to free a bytes, string, or fixed buffer once it is
- * no longer needed by the datum that wraps it.
- */
-
-typedef void
-(*avro_free_func_t)(void *ptr, size_t sz);
-
-/**
- * An avro_free_func_t that frees the buffer using the custom allocator
- * provided to avro_set_allocator.
- */
-
-void
-avro_alloc_free(void *ptr, size_t sz);
 
 /*
  * Datum constructors.  Each datum stores a reference to the schema that

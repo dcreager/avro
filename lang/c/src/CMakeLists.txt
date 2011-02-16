@@ -51,6 +51,7 @@ set(AVRO_SRC
     schema_equal.c
     st.c
     st.h
+    string.c
 )
 
 set(JANSSON_SRC

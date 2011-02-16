@@ -106,6 +106,54 @@ test_map(void)
 }
 
 
+static int
+test_string(void)
+{
+	avro_raw_string_t  str;
+
+	avro_raw_string_init(&str);
+
+	avro_raw_string_set(&str, "a");
+	avro_raw_string_set(&str, "abcdefgh");
+	avro_raw_string_set(&str, "abcd");
+
+	if (avro_raw_string_length(&str) != 5) {
+		fprintf(stderr, "Incorrect string size: got %zu, expected %zu.\n",
+			(size_t) avro_raw_string_length(&str),
+			(size_t) 5);
+		return EXIT_FAILURE;
+	}
+
+	if (strcmp(avro_raw_string_get(&str), "abcd") != 0) {
+		fprintf(stderr, "Incorrect string contents: "
+				"got \"%s\", expected \"%s\".\n",
+			(char *) avro_raw_string_get(&str),
+			"abcd");
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_string_give(&str, "abcd", NULL);
+
+	if (avro_raw_string_length(&str) != 5) {
+		fprintf(stderr, "Incorrect string size: got %zu, expected %zu.\n",
+			(size_t) avro_raw_string_length(&str),
+			(size_t) 5);
+		return EXIT_FAILURE;
+	}
+
+	if (strcmp(avro_raw_string_get(&str), "abcd") != 0) {
+		fprintf(stderr, "Incorrect string contents: "
+				"got \"%s\", expected \"%s\".\n",
+			(char *) avro_raw_string_get(&str),
+			"abcd");
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_string_done(&str);
+	return EXIT_SUCCESS;
+}
+
+
 int main(int argc, char *argv[])
 {
 	AVRO_UNUSED(argc);
@@ -117,7 +165,8 @@ int main(int argc, char *argv[])
 		avro_test func;
 	} tests[] = {
 		{ "array", test_array },
-		{ "map", test_map }
+		{ "map", test_map },
+		{ "string", test_string }
 	};
 
 	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
