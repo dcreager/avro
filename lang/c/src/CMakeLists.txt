@@ -20,8 +20,10 @@
 set(AVRO_SRC
     allocation.h
     allocation.c
+    array.c
     avro.h
     avro/consumer.h
+    avro/data.h
     avro/refcount.h
     avro_errors.h
     avro_private.h
