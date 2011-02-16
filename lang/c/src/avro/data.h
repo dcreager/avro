@@ -32,6 +32,10 @@ extern "C" {
  */
 
 
+/*---------------------------------------------------------------------
+ * Arrays
+ */
+
 /**
  * A resizeable array of fixed-size elements.
  */
@@ -77,6 +81,67 @@ void avro_raw_array_done(avro_raw_array_t *array);
  */
 
 void *avro_raw_array_append(avro_raw_array_t *array);
+
+
+/*---------------------------------------------------------------------
+ * Maps
+ */
+
+/**
+ * A string-indexed map of fixed-size elements.
+ */
+
+typedef struct avro_raw_map {
+	avro_raw_array_t  elements;
+	void  *indices_by_key;
+} avro_raw_map_t;
+
+/**
+ * Initializes a new avro_raw_map_t that you've allocated yourself.
+ */
+
+void avro_raw_map_init(avro_raw_map_t *map, size_t element_size);
+
+/**
+ * Finalizes an avro_raw_map_t.
+ */
+
+void avro_raw_map_done(avro_raw_map_t *map);
+
+/**
+ * Returns the number of elements in an avro_raw_map_t.
+ */
+
+#define avro_raw_map_size(map)  avro_raw_array_size(&((map)->elements))
+
+/**
+ * Returns the element of an avro_raw_map_t with the given numeric
+ * index.  The indexes are assigned based on the order that the elements
+ * are added to the map.
+ */
+
+#define avro_raw_map_get_by_index(map, element_type, index) \
+	avro_raw_array_get(&((map)->elements), element_type, index)
+
+/**
+ * Returns the element of an avro_raw_map_t with the given string key.
+ * If the given element doesn't exist, returns NULL.  If @ref index
+ * isn't NULL, it will be filled in with the index of the element.
+ */
+
+void *avro_raw_map_get(avro_raw_map_t *map, const char *key,
+		       unsigned int *index);
+
+/**
+ * Retrieves the element of an avro_raw_map_t with the given string key,
+ * creating it if necessary.  A pointer to the element is placed into
+ * @ref element.  If @ref index isn't NULL, it will be filled in with
+ * the index of the element.  We return 1 if the element is new; 0 if
+ * it's not, and a negative error code if there was some problem.
+ */
+
+int avro_raw_map_get_or_create(avro_raw_map_t *map, const char *key,
+			       void **element, unsigned int *index);
 
 
 CLOSE_EXTERN

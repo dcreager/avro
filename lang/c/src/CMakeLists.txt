@@ -44,6 +44,7 @@ set(AVRO_SRC
     encoding_binary.c
     errors.c
     io.c
+    map.c
     resolver.c
     schema.c
     schema.h

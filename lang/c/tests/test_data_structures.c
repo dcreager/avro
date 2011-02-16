@@ -26,6 +26,7 @@ static int  result = EXIT_SUCCESS;
 
 typedef int (*avro_test) (void);
 
+
 static int
 test_array(void)
 {
@@ -57,6 +58,54 @@ test_array(void)
 }
 
 
+static int
+test_map(void)
+{
+	avro_raw_map_t  map;
+	long  *element;
+	unsigned int  index;
+
+	avro_raw_map_init(&map, sizeof(long));
+	avro_raw_map_get_or_create(&map, "x", (void **) &element, NULL);
+	*element = 1;
+	avro_raw_map_get_or_create(&map, "y", (void **) &element, NULL);
+	*element = 3;
+
+	if (avro_raw_map_size(&map) != 2) {
+		fprintf(stderr, "Incorrect map size: got %zu, expected %zu.\n",
+			(size_t) avro_raw_map_size(&map),
+			(size_t) 2);
+		return EXIT_FAILURE;
+	}
+
+	if (avro_raw_map_get_by_index(&map, long, 0) != 1) {
+		fprintf(stderr, "Unexpected map element %u: got %ld, expected %ld.\n",
+			(unsigned int) 0,
+			avro_raw_map_get_by_index(&map, long, 0),
+			(long) 1);
+		return EXIT_FAILURE;
+	}
+
+	element = avro_raw_map_get(&map, "y", &index);
+	if (index != 1) {
+		fprintf(stderr, "Unexpected index for map element \"%s\": "
+			"got %u, expected %u.\n",
+			"y", index, 1);
+		return EXIT_FAILURE;
+	}
+
+	if (*element != 3) {
+		fprintf(stderr, "Unexpected map element %s: got %ld, expected %ld.\n",
+			"y",
+			*element, (long) 3);
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_map_done(&map);
+	return EXIT_SUCCESS;
+}
+
+
 int main(int argc, char *argv[])
 {
 	AVRO_UNUSED(argc);
@@ -67,7 +116,8 @@ int main(int argc, char *argv[])
 		char *name;
 		avro_test func;
 	} tests[] = {
-		{ "array", test_array }
+		{ "array", test_array },
+		{ "map", test_map }
 	};
 
 	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
