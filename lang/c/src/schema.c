@@ -464,6 +464,13 @@ avro_schema_t avro_schema_enum(const char *name)
 	return &enump->obj;
 }
 
+size_t avro_schema_enum_size(const avro_schema_t enump)
+{
+	check_param(EINVAL, is_avro_schema(enump), "enum schema");
+	check_param(EINVAL, is_avro_enum(enump), "enum schema");
+	return avro_schema_to_enum(enump)->symbols->num_entries;
+}
+
 const char *avro_schema_enum_get(const avro_schema_t enump,
 				 int index)
 {

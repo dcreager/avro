@@ -1,0 +1,133 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+/*
+ * This file uses some heavy macro fu to define a schema-specific C type
+ * to store the contents of an Avro datum of that schema type.
+ *
+ * This file creates the .h header file for a set of schema-specific
+ * types.  For the implementations of the functions declared by this
+ * file, see specific.c.in.
+ *
+ * The schema is defined by providing a "definition" file.  This file is
+ * a standard C header, which should define a single macro,
+ * SCHEMA_DEFINITION().  The contents of this macro should call the
+ * macros defined below to define the contents of the schema type.
+ * Normally, you should not have to construct one of these macros on
+ * your own; the avrocc utility will produce one for you given an AVSC
+ * schema file.
+ *
+ * Given this schema definition macro, we then construct several
+ * function prototypes in this file, and their definitions in
+ * specific.c.in, using the C preprocessor as our code templating
+ * engine.
+ */
+
+/*
+ * Macros available for use in SCHEMA_DEFINITION():
+ *
+ * Some commonalities:  All of these macros take in a "type_prefix"
+ * parameter.  The value of this parameter is prepended to every
+ * identifier that we create.  If the name of a parameter is given in
+ * ALL CAPS, then the value of that parameter should be in ALL CAPS,
+ * too.
+ *
+ * Several macros take in "foo_type" and "foo_reference" parameters.
+ * These are used to refer to other types in the schema definition.
+ * The foo_type value can be any of the valid values of the "type"
+ * element of a schema JSON object.  For a compound foo_type,
+ * foo_reference should refer to the name of a type definition that
+ * appears earlier in SCHEMA_DEFINITION.  To support recursive schemas,
+ * the foo_type value can also be "recursive", in which case
+ * foo_reference should refer to the name of a record type that has
+ * *not* been fully defined in SCHEMA_DEFINITION yet.
+ *
+ * AVRO_FORWARD(type_prefix, forward_type, forward_reference)
+ *
+ *   Predeclares a compound type.  This can be used for forward typedef
+ *   or function references, for instance.  The type value should
+ *   correspond to one of the valid compound types for the "type"
+ *   element of a schema JSON object.  The name value will refer to a
+ *   compound type whose definition will occur later in
+ *   SCHEMA_DEFINITION.
+ *
+ * AVRO_ARRAY(type_prefix, array_name, items_type, items_reference)
+ *
+ *   Defines an array type.  The array_name parameter should be
+ *   constructed from the name of the array's item type.  The items_type
+ *   and items_reference parameters should refer to another type as
+ *   described above.
+ *
+ * AVRO_ENUM_START(type_prefix, enum_name)
+ * AVRO_ENUM_SYMBOL(TYPE_PREFIX, ENUM_NAME,
+ *                  symbol_name, symbol_value, first, last)
+ * AVRO_ENUM_END(type_prefix, enum_name)
+ *
+ *   These macros define an enum type.  The enum_name parameter should
+ *   correspond to the name of the enum schema.  Each symbol in the enum
+ *   should get its own AVRO_ENUM_XXX_SYMBOL call, and the symbols
+ *   should be listed in numeric order.  (The symbol_name parameter is
+ *   listed in lowercase, but will usually be all-caps anyway, because
+ *   the symbol names themselves will be all-caps in the schema
+ *   definition.)  The first (last) parameter will be 1 for the first
+ *   (last) symbol, 0 for the others.
+ *
+ * AVRO_FIXED(type_prefix, fixed_name, size)
+ *
+ *   Defines a fixed type.  The fixed_name parameter should correspond
+ *   to the name of the fixed schema.
+ *
+ * AVRO_MAP(type_prefix, map_name, values_type, values_reference)
+ *
+ *   Defines a map type.  The map_name parameter should be constructed
+ *   from the name of the maps's value type.  The values_type and
+ *   values_reference parameters should refer to another type as
+ *   described above.
+ *
+ * AVRO_RECORD_START(type_prefix, record_name)
+ * AVRO_RECORD_FIELD(type_prefix, record_name, field_name,
+ *                   field_type, field_reference, first, last)
+ * AVRO_RECORD_END(type_prefix, record_name)
+ *
+ *   These macros define a record type.  The record_name parameter
+ *   should correspond to the name of the record schema.  Each field
+ *   should get its own AVRO_RECORD_XXX_FIELD call, and the fields
+ *   should be listed in numeric order.  The field_type and
+ *   field_reference parameters should refer to another type as
+ *   described above.  The first (last) parameter will be 1 for the
+ *   first (last) field, 0 for the others.
+ *
+ * AVRO_UNION_START(type_prefix, union_name)
+ * AVRO_UNION_BRANCH(type_prefix, union_name, index,
+ *                   branch_type, branch_reference, first, last)
+ * AVRO_UNION_END(type_prefix, union_name)
+ *
+ *   These macros define a union type.  The union_name parameter should
+ *   constructed by concatenating the names of the branches of the
+ *   union.  Each branch should get its own AVRO_UNION_XXX_BRANCH call,
+ *   and the branches should be listed in numeric order.  The
+ *   branch_type and branch_reference parameters should refer to another
+ *   type as described above.  The first (last) parameter will be 1 for
+ *   the first (last) branch, 0 for the others.
+ */
+
+#if !defined(SCHEMA_DEFINITION)
+#error Must provide a SCHEMA_DEFINITION macro.
+#endif
+
+#include <avro/specific/typedef.h.in>
+#include <avro/specific/lifecycle.h.in>

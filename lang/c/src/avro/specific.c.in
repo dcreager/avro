@@ -1,0 +1,35 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+/*
+ * This file uses some heavy macro fu to define a schema-specific C type
+ * to store the contents of an Avro datum of that schema type.
+ *
+ * This file creates the .c implementation file for a set of
+ * schema-specific types.  For the declarations of the functions
+ * implemented in this file, see specific.h.in.
+ *
+ * You can find the documentation for the macro fu used in this file in
+ * specific.h.in.
+ */
+
+#if !defined(SCHEMA_DEFINITION)
+#error Must provide a SCHEMA_DEFINITION macro.
+#endif
+
+#include <avro/specific/init.c.in>
+#include <avro/specific/done.c.in>

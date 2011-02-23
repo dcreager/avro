@@ -25,6 +25,12 @@ set(AVRO_SRC
     avro/consumer.h
     avro/data.h
     avro/refcount.h
+    avro/specific.c.in
+    avro/specific.h.in
+    avro/specific/done.c.in
+    avro/specific/init.c.in
+    avro/specific/lifecycle.h.in
+    avro/specific/typedef.h.in
     avro_errors.h
     avro_private.h
     consumer.c
@@ -49,6 +55,7 @@ set(AVRO_SRC
     schema.c
     schema.h
     schema_equal.c
+    schema_specific.c
     st.c
     st.h
     string.c
@@ -91,6 +98,17 @@ install(DIRECTORY
         ${CMAKE_CURRENT_SOURCE_DIR}/avro
         DESTINATION include
         FILES_MATCHING PATTERN "*.h")
+install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific.c.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific.h.in
+        DESTINATION include/avro)
+install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/done.c.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/init.c.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/lifecycle.h.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/typedef.h.in
+        DESTINATION include/avro/specific)
+
 install(TARGETS avro-static avro-shared
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
@@ -104,3 +122,7 @@ set(VERSION ${AVRO_VERSION})
 configure_file(avro-c.pc.in avro-c.pc)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/avro-c.pc
         DESTINATION lib/pkgconfig)
+
+add_executable(avrocc avrocc.c)
+target_link_libraries(avrocc avro-static)
+install(TARGETS avrocc RUNTIME DESTINATION bin)

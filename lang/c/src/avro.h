@@ -155,6 +155,7 @@ size_t avro_schema_record_size(const avro_schema_t record);
 avro_schema_t avro_schema_enum(const char *name);
 const char *avro_schema_enum_get(const avro_schema_t enump,
 				 int index);
+size_t avro_schema_enum_size(const avro_schema_t enump);
 int avro_schema_enum_get_by_name(const avro_schema_t enump,
 				 const char *symbol_name);
 int avro_schema_enum_symbol_append(const avro_schema_t
@@ -187,7 +188,10 @@ int avro_schema_from_json(const char *jsontext,
 			  avro_schema_t * schema, avro_schema_error_t * error);
 int avro_schema_to_json(const avro_schema_t schema, avro_writer_t out);
 
-int avro_schema_to_specific(avro_schema_t schema, const char *prefix);
+int avro_schema_to_specific(avro_schema_t schema,
+			    const char *output_path,
+			    const char *filename_prefix,
+			    const char *type_prefix);
 
 avro_schema_t avro_schema_get_subschema(const avro_schema_t schema,
          const char *name);

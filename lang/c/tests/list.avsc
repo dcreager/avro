@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "list",
+  "fields": [
+    { "name": "point", "type":
+      {
+        "type": "record",
+        "name": "point",
+        "fields": [
+          { "name": "x", "type": "int" },
+          { "name": "y", "type": "int" }
+        ]
+      } },
+    { "name": "ip", "type": { "type": "fixed", "name": "ipv4", "size": 4 }},
+    { "name": "attrs", "type": { "type": "map", "values": "string" } },
+    { "name": "next", "type": ["null", "list"] }
+  ]
+}

@@ -17,6 +17,8 @@
 # under the License.
 #
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(generate_interop_data generate_interop_data.c)
 target_link_libraries(generate_interop_data avro-static)
 
@@ -45,3 +47,25 @@ add_test(test_avro_data ${CMAKE_COMMAND} -E chdir ${AvroC_SOURCE_DIR}/tests ${CM
 add_executable(test_cpp test_cpp.cpp)
 target_link_libraries(test_cpp avro-static)
 add_test(test_cpp ${CMAKE_COMMAND} -E chdir ${AvroC_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/test_cpp)
+
+add_custom_command(
+    OUTPUT
+      ${CMAKE_CURRENT_BINARY_DIR}/specific_list.h
+      ${CMAKE_CURRENT_BINARY_DIR}/specific_list.c
+    COMMAND
+      ${CMAKE_CURRENT_BINARY_DIR}/../src/avrocc
+        -f specific_
+        -O ${CMAKE_CURRENT_BINARY_DIR}
+        -t specific
+        ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
+    DEPENDS
+      ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
+)
+
+add_executable(test_specific
+    ${CMAKE_CURRENT_BINARY_DIR}/specific_list.h
+    ${CMAKE_CURRENT_BINARY_DIR}/specific_list.c
+    test_specific.c
+)
+target_link_libraries(test_specific avro-static)
+add_test(test_specific ${CMAKE_COMMAND} -E chdir ${AvroC_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR}/test_specific)

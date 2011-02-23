@@ -10,10 +10,16 @@ nobase_include_HEADERS = avro.h \
 avro/allocation.h \
 avro/consumer.h \
 avro/data.h \
-avro/refcount.h
+avro/refcount.h \
+avro/specific.h.in avro/specific.c.in \
+avro/specific/done.c.in \
+avro/specific/init.c.in \
+avro/specific/lifecycle.h.in \
+avro/specific/typedef.h.in
 
 lib_LTLIBRARIES = libavro.la
 libavro_la_SOURCES = st.c st.h schema.c schema.h schema_equal.c \
+schema_specific.c \
 datum.c datum_equal.c datum_validate.c datum_read.c datum_skip.c datum_write.c datum_size.c datum.h \
 datum_json.c \
 array.c map.c string.c \
@@ -27,3 +33,7 @@ libavro_la_LDFLAGS = \
         -version-info $(LIBAVRO_VERSION) \
         -release $(VERSION) \
         -export-dynamic
+
+bin_PROGRAMS = avrocc
+avrocc_SOURCES = avrocc.c
+avrocc_LDADD = libavro.la

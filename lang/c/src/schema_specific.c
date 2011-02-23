@@ -15,216 +15,602 @@
  * permissions and limitations under the License. 
  */
 
-#include "avro_private.h"
-#include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "avro.h"
+#include "avro_errors.h"
+#include "avro_private.h"
 #include "schema.h"
+#include "st.h"
 
-enum specific_state {
-	START_STATE,
-};
-typedef enum specific_state specific_state;
 
-struct specific_ctx {
-	FILE *header;
-	FILE *source;
-	int depth;
-	specific_state state;
-};
-typedef struct specific_ctx specific_ctx;
-
-static void indent(specific_ctx * ctx, FILE * fp)
+static void
+strupcase(char *str)
 {
-	int i;
-	for (i = 0; i < ctx->depth; i++) {
-		fprintf(fp, "   ");
+	char  *c;
+	for (c = str; *c != '\0'; c++) {
+		*c = toupper(*c);
 	}
 }
 
-static int avro_schema_to_source(avro_schema_t schema, specific_ctx * ctx)
+
+#define MAX_RECURSION_DEPTH  64
+
+typedef struct specific_ctx {
+	const char  *type_prefix;
+	char  *upper_type_prefix;
+	avro_writer_t  writer;
+
+	st_table  *started_schemas;
+
+	unsigned int  stack_size;
+	avro_schema_t  schema_stack[MAX_RECURSION_DEPTH];
+} specific_ctx_t;
+
+static int
+write(avro_writer_t writer, const char *fmt, ...)
 {
-	switch (schema->type) {
-	default:
-		return 0;
-	}
-	return EINVAL;
-}
+	int  rval;
+	char  buf[4096];
+	va_list  args;
+	unsigned int  len;
 
-static int avro_schema_to_header(avro_schema_t schema, specific_ctx * ctx)
-{
-	size_t i;
-	FILE *fp = ctx->header;
+	va_start(args, fmt);
+	len = vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
 
-	indent(ctx, fp);
-	ctx->depth++;
-
-	if (is_avro_primitive(schema) && !ctx->name) {
-		return 0;
-	}
-
-	switch (schema->type) {
-	case AVRO_STRING:
-		fprintf(fp, "char *%s;\n", ctx->name);
-		break;
-
-	case AVRO_BYTES:
-		fprintf(fp, "struct %s { size_t %s_len; char *%s_val } %s;\n",
-			ctx->name, ctx->name, ctx->name, ctx->name);
-		break;
-
-	case AVRO_INT:
-		fprintf(fp, "int %s;\n", ctx->name);
-		break;
-
-	case AVRO_LONG:
-		fprintf(fp, "long %s;\n", ctx->name);
-		break;
-
-	case AVRO_FLOAT:
-		fprintf(fp, "float %s;\n", ctx->name);
-		break;
-
-	case AVRO_DOUBLE:
-		fprintf(fp, "double %s;\n", ctx->name);
-		break;
-
-	case AVRO_BOOLEAN:
-		fprintf(fp, "int %s; /* boolean */\n", ctx->name);
-		break;
-
-	case AVRO_NULL:
-		break;
-
-	case AVRO_RECORD:
-		{
-			struct schema_record_t *record_schema =
-			    avro_schema_to_record(schema);
-			fprintf(fp, "struct %s {\n", record_schema->name);
-			for (i = 0; i < record_schema->num_fields; i++) {
-				struct record_field_t *field =
-				    record_schema->fields[i];
-				ctx->name = field->name;
-				avro_schema_to_header(field->type, ctx);
-				ctx->name = NULL;
-			}
-			fprintf(fp, "};\n");
-			fprintf(fp, "typedef struct %s %s;\n\n",
-				record_schema->name, record_schema->name);
-		}
-		break;
-
-	case AVRO_ENUM:
-		{
-			struct schema_enum_t *enum_schema =
-			    avro_schema_to_enum(schema);
-			fprintf(fp, "enum %s {\n", enum_schema->name);
-			ctx->depth++;
-			for (i = 0; i < enum_schema->num_symbols; i++) {
-				indent(ctx, fp);
-				fprintf(fp, "%s = %ld,\n",
-					enum_schema->symbols[i], i);
-			}
-			ctx->depth--;
-			fprintf(fp, "};\n");
-			fprintf(fp, "typedef enum %s %s;\n\n",
-				enum_schema->name, enum_schema->name);
-		}
-		break;
-
-	case AVRO_FIXED:
-		{
-			struct schema_fixed_t *fixed_schema =
-			    avro_schema_to_fixed(schema);
-			fprintf(fp, "char %s[%ld];\n", fixed_schema->name,
-				fixed_schema->size);
-		}
-		break;
-
-	case AVRO_MAP:
-		{
-
-		}
-		break;
-
-	case AVRO_ARRAY:
-		{
-			struct schema_array_t *array_schema =
-			    avro_schema_to_array(schema);
-			if (!ctx->name) {
-				break;
-			}
-			fprintf(fp, "struct { size_t %s_len; ", ctx->name);
-			if (is_avro_named_type(array_schema->items)) {
-				fprintf(fp, "%s",
-					avro_schema_name(array_schema->items));
-			} else if (is_avro_link(array_schema->items)) {
-				struct schema_link_t *link_schema =
-				    avro_schema_to_link(array_schema->items);
-				fprintf(fp, "struct %s",
-					avro_schema_name(link_schema->to));
-			} else {
-				avro_schema_to_header(array_schema->items, ctx);
-			}
-			fprintf(fp, " *%s_val;} %s;\n", ctx->name, ctx->name);
-		}
-		break;
-	case AVRO_UNION:
-		{
-			struct schema_union_t *union_schema =
-			    avro_schema_to_array(schema);
-			if (!ctx->name) {
-				break;
-			}
-			fprintf(fp, "union {\n");
-			for (i = 0; i < union_schema->num_schemas; i++) {
-				avro_schema_to_header(union_schema->schemas[i],
-						      ctx);
-			}
-			fprintf(fp, "%s_u;\n");
-		}
-		break;
-	case AVRO_LINK:
-		break;
-	default:
+	if (len >= sizeof(buf)) {
+		avro_set_error("Buffer overflow");
 		return EINVAL;
 	}
 
-	ctx->depth--;
+	check(rval, avro_write(writer, buf, len));
 	return 0;
 }
 
-int avro_schema_to_specific(avro_schema_t schema, const char *prefix)
+static int
+write_union_name(specific_ctx_t *ctx, avro_schema_t schema)
 {
-	specific_ctx ctx;
-	char buf[1024];
-	int rval;
+	int  rval;
+	size_t  num_branches = avro_schema_union_size(schema);
+	unsigned int  i;
+	int  first = 1;
+
+	for (i = 0; i < num_branches; i++) {
+		if (first) {
+			first = 0;
+		} else {
+			check(rval, write(ctx->writer, "_"));
+		}
+
+		avro_schema_t  branch = avro_schema_union_branch(schema, i);
+		check(rval, write(ctx->writer, "%s", avro_schema_type_name(branch)));
+	}
+
+	return 0;
+}
+
+static int
+write_array_map_name(specific_ctx_t *ctx, avro_schema_t items)
+{
+	int  rval;
+	switch (avro_typeof(items)) {
+		case AVRO_ARRAY:
+			check(rval, write(ctx->writer, "array_"));
+			return write_array_map_name
+			    (ctx, avro_schema_array_items(items));
+
+		case AVRO_MAP:
+			check(rval, write(ctx->writer, "map_"));
+			return write_array_map_name
+			    (ctx, avro_schema_map_values(items));
+
+		case AVRO_UNION:
+			return write_union_name(ctx, items);
+
+		default:
+			check(rval, write(ctx->writer, "%s",
+					  avro_schema_type_name(items)));
+			return 0;
+	}
+}
+
+
+/**
+ * Outputs a reference to the definition of an Avro schema.
+ */
+
+static int
+avro_schema_type_ref(specific_ctx_t *ctx, avro_schema_t schema)
+{
+	int  rval;
+	switch (avro_typeof(schema)) {
+		case AVRO_ARRAY:
+			{
+				avro_schema_t  items =
+				    avro_schema_array_items(schema);
+				check(rval, write(ctx->writer, "array, "));
+				check(rval, write_array_map_name(ctx, items));
+				return 0;
+			}
+
+		case AVRO_ENUM:
+			{
+				const char  *type_name = avro_schema_name(schema);
+				check(rval, write(ctx->writer, "enum, %s",
+						  type_name));
+				return 0;
+			}
+
+		case AVRO_FIXED:
+			{
+				const char  *type_name = avro_schema_name(schema);
+				check(rval, write(ctx->writer, "fixed, %s",
+						  type_name));
+				return 0;
+			}
+
+		case AVRO_MAP:
+			{
+				avro_schema_t  items =
+				    avro_schema_map_values(schema);
+				check(rval, write(ctx->writer, "map, "));
+				check(rval, write_array_map_name(ctx, items));
+				return 0;
+			}
+
+		case AVRO_RECORD:
+			{
+				/*
+				 * If the schema that's being referred
+				 * to is on the current schema stack,
+				 * then we have a recursive reference.
+				 */
+
+				const char  *type_name = avro_schema_name(schema);
+				const char  *reference_type = "record";
+				unsigned int  i;
+
+				for (i = 0; i < ctx->stack_size; i++) {
+					if (ctx->schema_stack[i] == schema) {
+						reference_type = "recursive";
+					}
+				}
+
+				check(rval, write(ctx->writer, "%s, %s",
+						  reference_type, type_name));
+				return 0;
+			}
+
+		case AVRO_UNION:
+			check(rval, write(ctx->writer, "union, "));
+			check(rval, write_union_name(ctx, schema));
+			return 0;
+
+		case AVRO_LINK:
+			{
+				avro_schema_t  target =
+				    avro_schema_link_target(schema);
+				return avro_schema_type_ref(ctx, target);
+			}
+
+		default:
+			check(rval, write(ctx->writer, "%s, _",
+					  avro_schema_type_name(schema)));
+			return 0;
+	}
+}
+
+
+/**
+ * Outputs a definition header file for an Avro schema.  We make a
+ * recursive call to ensure that the definitions for any child schemas
+ * will be written before they're referred to.
+ */
+
+static int
+avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
+{
+	int  rval;
+
+	/*
+	 * If this is a linked schema, just immediately process the
+	 * link's target.
+	 */
+
+	if (is_avro_link(schema)) {
+		avro_schema_t  target = avro_schema_link_target(schema);
+		return avro_schema_write_def(ctx, target);
+	}
+
+	/*
+	 * If we've already started processing this schema, just return.
+	 * (We might be in the middle of processing the schema, if the
+	 * schema is recursive.)
+	 */
+
+	if (st_lookup(ctx->started_schemas, (st_data_t) schema, NULL)) {
+		return 0;
+	}
+
+	/*
+	 * Add this schema to the started set, so that we don't try to
+	 * process it twice.
+	 */
+
+	if (ctx->stack_size == MAX_RECURSION_DEPTH) {
+		avro_set_error("Exceeded schema recursion depth");
+		return EINVAL;
+	}
+
+	ctx->schema_stack[ctx->stack_size++] = schema;
+	st_insert(ctx->started_schemas, (st_data_t) schema, (st_data_t) NULL);
+
+	/*
+	 * Output forward declarations before recursing.
+	 */
+
+	switch (avro_typeof(schema)) {
+		case AVRO_ARRAY:
+			{
+				avro_schema_t  items =
+				    avro_schema_array_items(schema);
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_FORWARD(%s, array, ",
+				      ctx->type_prefix));
+				check(rval, write_array_map_name(ctx, items));
+				check(rval, write(ctx->writer, ") \\\n"));
+				break;
+			}
+
+		case AVRO_ENUM:
+			check(rval, write(ctx->writer,
+			      "  \\\n  AVRO_FORWARD(%s, enum, %s) \\\n",
+			      ctx->type_prefix, avro_schema_name(schema)));
+			break;
+
+		case AVRO_FIXED:
+			check(rval, write(ctx->writer,
+			      "  \\\n  AVRO_FORWARD(%s, fixed, %s) \\\n",
+			      ctx->type_prefix, avro_schema_name(schema)));
+			break;
+
+		case AVRO_MAP:
+			{
+				avro_schema_t  items =
+				    avro_schema_map_values(schema);
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_FORWARD(%s, map, ",
+				      ctx->type_prefix));
+				check(rval, write_array_map_name(ctx, items));
+				check(rval, write(ctx->writer, ") \\\n"));
+				break;
+			}
+
+		case AVRO_RECORD:
+			check(rval, write(ctx->writer,
+			      "  \\\n  AVRO_FORWARD(%s, record, %s) \\\n",
+			      ctx->type_prefix, avro_schema_name(schema)));
+			break;
+
+		case AVRO_UNION:
+			check(rval, write(ctx->writer,
+			      "  \\\n  AVRO_FORWARD(%s, union, ",
+			      ctx->type_prefix));
+			check(rval, write_union_name(ctx, schema));
+			check(rval, write(ctx->writer, ") \\\n"));
+			break;
+
+		default:
+			break;
+	}
+
+	/*
+	 * Recurse through the children of this schema.
+	 */
+
+	switch (avro_typeof(schema)) {
+		case AVRO_ARRAY:
+			{
+				avro_schema_t  child =
+				    avro_schema_array_items(schema);
+				check(rval, avro_schema_write_def(ctx, child));
+				break;
+			}
+
+		case AVRO_MAP:
+			{
+				avro_schema_t  child =
+				    avro_schema_map_values(schema);
+				check(rval, avro_schema_write_def(ctx, child));
+				break;
+			}
+
+		case AVRO_RECORD:
+			{
+				size_t  num_fields =
+				    avro_schema_record_size(schema);
+				unsigned int  i;
+
+				for (i = 0; i < num_fields; i++) {
+					avro_schema_t  child =
+					    avro_schema_record_field_get_by_index
+					    (schema, i);
+					check(rval, avro_schema_write_def(ctx, child));
+				}
+				break;
+			}
+
+		case AVRO_UNION:
+			{
+				size_t  num_branches =
+				    avro_schema_union_size(schema);
+				unsigned int  i;
+
+				for (i = 0; i < num_branches; i++) {
+					avro_schema_t  child =
+					    avro_schema_union_branch(schema, i);
+					check(rval, avro_schema_write_def(ctx, child));
+				}
+				break;
+			}
+
+		default:
+			break;
+	}
+
+	/*
+	 * Output the definition of this schema once all of its children
+	 * have been written.
+	 */
+
+	switch (avro_typeof(schema)) {
+		case AVRO_ARRAY:
+			{
+				avro_schema_t  items =
+				    avro_schema_array_items(schema);
+
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_ARRAY(%s, ",
+				      ctx->type_prefix));
+				check(rval, write_array_map_name(ctx, items));
+				check(rval, write(ctx->writer, ", "));
+				check(rval, avro_schema_type_ref(ctx, items));
+				check(rval, write(ctx->writer, ") \\\n"));
+				break;
+			}
+
+		case AVRO_ENUM:
+			{
+				const char  *enum_name = avro_schema_name(schema);
+
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_ENUM_START(%s, %s) \\\n",
+				      ctx->type_prefix, enum_name));
+
+				char  *upper_enum_name = strdup(enum_name);
+				strupcase(upper_enum_name);
+
+				size_t  num_symbols =
+				    avro_schema_enum_size(schema);
+				unsigned int  i;
+				for (i = 0; i < num_symbols; i++) {
+					check(rval, write(ctx->writer,
+					      "  AVRO_ENUM_SYMBOL(%s, %s, %s, %u,"
+					      " %u, %u) \\\n",
+					      ctx->upper_type_prefix,
+					      upper_enum_name,
+					      avro_schema_enum_get(schema, i),
+					      i, (i == 0), (i == num_symbols-1)));
+				}
+
+				check(rval, write(ctx->writer,
+				      "  AVRO_ENUM_END(%s, %s) \\\n",
+				      ctx->type_prefix, enum_name));
+
+				free(upper_enum_name);
+				break;
+			}
+
+		case AVRO_FIXED:
+			{
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_FIXED(%s, %s, %lu) \\\n",
+				      ctx->type_prefix,
+				      avro_schema_name(schema),
+				      (unsigned long) avro_schema_fixed_size(schema)));
+				break;
+			}
+
+		case AVRO_MAP:
+			{
+				avro_schema_t  items =
+				    avro_schema_map_values(schema);
+
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_MAP(%s, ",
+				      ctx->type_prefix));
+				check(rval, write_array_map_name(ctx, items));
+				check(rval, write(ctx->writer, ", "));
+				check(rval, avro_schema_type_ref(ctx, items));
+				check(rval, write(ctx->writer, ") \\\n"));
+				break;
+			}
+
+		case AVRO_RECORD:
+			{
+				const char  *record_name = avro_schema_name(schema);
+
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_RECORD_START(%s, %s) \\\n",
+				      ctx->type_prefix, record_name));
+
+				size_t  num_fields =
+				    avro_schema_record_size(schema);
+				unsigned int  i;
+				for (i = 0; i < num_fields; i++) {
+					const char  *field_name =
+					    avro_schema_record_field_name
+					    (schema, i);
+					avro_schema_t  field =
+					    avro_schema_record_field_get_by_index
+					    (schema, i);
+
+					check(rval, write(ctx->writer,
+					      "  AVRO_RECORD_FIELD(%s, %s, %s, ",
+					      ctx->type_prefix, record_name,
+					      field_name));
+					check(rval, avro_schema_type_ref(ctx, field));
+					check(rval, write(ctx->writer,
+					      ", %u, %u) \\\n",
+					      (i == 0), (i == num_fields-1)));
+				}
+
+				check(rval, write(ctx->writer,
+				      "  AVRO_RECORD_END(%s, %s) \\\n",
+				      ctx->type_prefix, record_name));
+				break;
+			}
+
+		case AVRO_UNION:
+			{
+				check(rval, write(ctx->writer,
+				      "  \\\n  AVRO_UNION_START(%s, ",
+				      ctx->type_prefix));
+				check(rval, write_union_name(ctx, schema));
+				check(rval, write(ctx->writer, ") \\\n"));
+
+				size_t  num_branches =
+				    avro_schema_union_size(schema);
+				unsigned int  i;
+				for (i = 0; i < num_branches; i++) {
+					avro_schema_t  branch =
+					    avro_schema_union_branch(schema, i);
+
+					check(rval, write(ctx->writer,
+					      "  AVRO_UNION_BRANCH(%s, ",
+					      ctx->type_prefix));
+					check(rval, write_union_name(ctx, schema));
+					check(rval, write(ctx->writer, ", %u, ", i));
+					check(rval, avro_schema_type_ref(ctx, branch));
+					check(rval, write(ctx->writer,
+					      ", %u, %u) \\\n",
+					      i, (i == 0), (i == num_branches-1)));
+				}
+
+				check(rval, write(ctx->writer,
+				      "  AVRO_UNION_END(%s, ",
+				      ctx->type_prefix));
+				check(rval, write_union_name(ctx, schema));
+				check(rval, write(ctx->writer, ") \\\n"));
+				break;
+			}
+
+		default:
+			break;
+	}
+
+	/*
+	 * Pop this schema off the stack before returning.
+	 */
+
+	ctx->stack_size--;
+	return 0;
+}
+
+
+#define check_out(rval, call) { rval = call; if (rval) goto out; }
+
+int avro_schema_to_specific(avro_schema_t schema,
+			    const char *output_path,
+			    const char *filename_prefix,
+			    const char *type_prefix)
+{
+	int  rval;
+	specific_ctx_t  ctx;
+	char  buf[1024];
+	FILE  *fp;
 
 	if (!schema) {
 		return EINVAL;
 	}
 
-	memset(&ctx, 0, sizeof(ctx));
-	snprintf(buf, sizeof(buf), "%s_avro.h", prefix);
-	ctx.header = fopen(buf, "w");
-	if (!ctx.header) {
-		return errno;
-	}
-	snprintf(buf, sizeof(buf), "%s_avro.c", prefix);
-	ctx.source = fopen(buf, "w");
-	if (!ctx.source) {
+	ctx.type_prefix = type_prefix;
+	ctx.upper_type_prefix = strdup(ctx.type_prefix);
+	strupcase(ctx.upper_type_prefix);
+
+	/* Definition file */
+
+	snprintf(buf, sizeof(buf), "%s/%s%s.def",
+		 output_path, filename_prefix,
+		 avro_schema_type_name(schema));
+	fp = fopen(buf, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
 		return errno;
 	}
 
-	rval = avro_schema_to_header(schema, &ctx);
-	if (rval) {
-		goto out;
+	ctx.writer = avro_writer_file(fp);
+	check_out(rval, write(ctx.writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#define SCHEMA_DEFINITION() \\\n"));
+	ctx.started_schemas = st_init_numtable();
+	ctx.stack_size = 0;
+	check_out(rval, avro_schema_write_def(&ctx, schema));
+	st_free_table(ctx.started_schemas);
+	check_out(rval, write(ctx.writer, "  /* end of schema definition */\n"));
+	avro_writer_free(ctx.writer);
+
+	/* Header file */
+
+	snprintf(buf, sizeof(buf), "%s/%s%s.h",
+		 output_path, filename_prefix,
+		 avro_schema_type_name(schema));
+	fp = fopen(buf, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
+		return errno;
 	}
 
-	rval = avro_schema_to_source(schema, &ctx);
+	ctx.writer = avro_writer_file(fp);
+	check_out(rval, write(ctx.writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#include \"%s%s.def\"\n"
+		  "#include <avro/specific.h.in>\n"
+		  "#undef SCHEMA_DEFINITION\n",
+		  filename_prefix, avro_schema_type_name(schema)));
+	avro_writer_free(ctx.writer);
+
+	/* Source file */
+
+	snprintf(buf, sizeof(buf), "%s/%s%s.c",
+		 output_path, filename_prefix,
+		 avro_schema_type_name(schema));
+	fp = fopen(buf, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
+		return errno;
+	}
+
+	ctx.writer = avro_writer_file(fp);
+	check_out(rval, write(ctx.writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#include \"%s%s.h\"\n"
+		  "#include \"%s%s.def\"\n"
+		  "#include <avro/specific.c.in>\n"
+		  "#undef SCHEMA_DEFINITION\n",
+		  filename_prefix, avro_schema_type_name(schema),
+		  filename_prefix, avro_schema_type_name(schema)));
+	avro_writer_free(ctx.writer);
+	return 0;
 
       out:
-	fclose(ctx.header);
-	fclose(ctx.source);
+	avro_writer_free(ctx.writer);
+	free(ctx.upper_type_prefix);
 	return rval;
 }
