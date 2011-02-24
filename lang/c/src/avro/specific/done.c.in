@@ -136,7 +136,7 @@
 
 
 #define AVRO_UNION_START(tp, name) \
-	void tp##_##name##_done(tp##_##name##_t *obj) \
+	void tp##_##name##_clear(tp##_##name##_t *obj) \
 	{
 
 #define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last) \
@@ -147,6 +147,11 @@
 
 #define AVRO_UNION_END(tp, name) \
 		obj->discriminant = -1; \
+	} \
+	\
+	void tp##_##name##_done(tp##_##name##_t *obj) \
+	{ \
+		tp##_##name##_clear(obj); \
 	} \
 	\
 	void tp##_##name##_free(tp##_##name##_t *obj) \
@@ -186,6 +191,23 @@ SCHEMA_DEFINITION()
 #undef AVRO_TYPE_REF_record
 #undef AVRO_TYPE_REF_recursive
 #undef AVRO_TYPE_REF_union
+
+#undef AVRO_TYPE_NAME
+#undef AVRO_TYPE_NAME_boolean
+#undef AVRO_TYPE_NAME_bytes
+#undef AVRO_TYPE_NAME_float
+#undef AVRO_TYPE_NAME_double
+#undef AVRO_TYPE_NAME_int
+#undef AVRO_TYPE_NAME_long
+#undef AVRO_TYPE_NAME_null
+#undef AVRO_TYPE_NAME_string
+#undef AVRO_TYPE_NAME_array
+#undef AVRO_TYPE_NAME_enum
+#undef AVRO_TYPE_NAME_fixed
+#undef AVRO_TYPE_NAME_map
+#undef AVRO_TYPE_NAME_record
+#undef AVRO_TYPE_NAME_recursive
+#undef AVRO_TYPE_NAME_union
 
 #undef AVRO_TYPE_DONE
 #undef AVRO_TYPE_DONE_boolean

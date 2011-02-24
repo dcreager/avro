@@ -34,13 +34,11 @@ test_lifecycle(void)
 
         memcpy(list.ip, "\xc0\xa8\x00\x01", sizeof(list.ip));
 
-        list.next.discriminant = 1;
-        list.next.branch.list = specific_list_new();
-
+	specific_null_list_set_list(&list.next);
         list.next.branch.list->point.x = 1;
         list.next.branch.list->point.y = 1;
 
-        list.next.branch.list->next.discriminant = 0;
+	specific_null_list_set_null(&list.next.branch.list->next);
 
 	specific_list_done(&list);
         return EXIT_SUCCESS;

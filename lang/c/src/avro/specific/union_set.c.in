@@ -1,0 +1,193 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+/*
+ * This file creates definitions for the functions that manipulate union
+ * values.
+ */
+
+
+/* Define some helper macros */
+
+#define AVRO_TYPE_NAME(type, ref)  AVRO_TYPE_NAME_##type(ref)
+
+#define AVRO_TYPE_NAME_boolean(ref)         boolean
+#define AVRO_TYPE_NAME_bytes(ref)           bytes
+#define AVRO_TYPE_NAME_float(ref)           float
+#define AVRO_TYPE_NAME_double(ref)          double
+#define AVRO_TYPE_NAME_int(ref)             int
+#define AVRO_TYPE_NAME_long(ref)            long
+#define AVRO_TYPE_NAME_null(ref)            null
+#define AVRO_TYPE_NAME_string(ref)          string
+
+#define AVRO_TYPE_NAME_array(ref)           array##_##ref
+#define AVRO_TYPE_NAME_enum(ref)            ref
+#define AVRO_TYPE_NAME_fixed(ref)           ref
+#define AVRO_TYPE_NAME_map(ref)             map##_##ref
+#define AVRO_TYPE_NAME_record(ref)          ref
+#define AVRO_TYPE_NAME_recursive(ref)       ref
+#define AVRO_TYPE_NAME_union(ref)           ref
+
+
+#define AVRO_TYPE_FIELD(type, ref)  AVRO_TYPE_FIELD_##type(ref)
+
+#define AVRO_TYPE_FIELD_boolean(ref)        boolean_val
+#define AVRO_TYPE_FIELD_bytes(ref)          bytes_val
+#define AVRO_TYPE_FIELD_float(ref)          float_val
+#define AVRO_TYPE_FIELD_double(ref)         double_val
+#define AVRO_TYPE_FIELD_int(ref)            int_val
+#define AVRO_TYPE_FIELD_long(ref)           long_val
+#define AVRO_TYPE_FIELD_null(ref)           null_val
+#define AVRO_TYPE_FIELD_string(ref)         string_val
+
+#define AVRO_TYPE_FIELD_array(ref)          array##_##ref
+#define AVRO_TYPE_FIELD_enum(ref)           ref
+#define AVRO_TYPE_FIELD_fixed(ref)          ref
+#define AVRO_TYPE_FIELD_map(ref)            map##_##ref
+#define AVRO_TYPE_FIELD_record(ref)         ref
+#define AVRO_TYPE_FIELD_recursive(ref)      ref
+#define AVRO_TYPE_FIELD_union(ref)          ref
+
+
+#define AVRO_TYPE_INIT(tp, type, ref, name)  AVRO_TYPE_INIT_##type(tp, ref, name)
+
+#define AVRO_TYPE_INIT_boolean(tp, ref, name)  obj->name = 0
+#define AVRO_TYPE_INIT_bytes(tp, ref, name)    avro_raw_string_init(&obj->name)
+#define AVRO_TYPE_INIT_float(tp, ref, name)    obj->name = 0
+#define AVRO_TYPE_INIT_double(tp, ref, name)   obj->name = 0
+#define AVRO_TYPE_INIT_int(tp, ref, name)      obj->name = 0
+#define AVRO_TYPE_INIT_long(tp, ref, name)     obj->name = 0
+#define AVRO_TYPE_INIT_null(tp, ref, name)     obj->name = 0
+#define AVRO_TYPE_INIT_string(tp, ref, name)   avro_raw_string_init(&obj->name)
+
+#define AVRO_TYPE_INIT_array(tp, ref, name)      tp##_array_##ref##_init(&obj->name)
+#define AVRO_TYPE_INIT_enum(tp, ref, name)       obj->name = 0
+#define AVRO_TYPE_INIT_fixed(tp, ref, name) \
+	memset(obj->name, 0, sizeof(AVRO_TYPE_REF_fixed(tp, ref)))
+#define AVRO_TYPE_INIT_map(tp, ref, name)        tp##_map_##ref##_init(&obj->name)
+#define AVRO_TYPE_INIT_record(tp, ref, name)     tp##_##ref##_init(&obj->name)
+#define AVRO_TYPE_INIT_recursive(tp, ref, name)  obj->name = tp##_##ref##_new()
+#define AVRO_TYPE_INIT_union(tp, ref, name)      tp##_##ref##_init(&obj->name)
+
+
+#define AVRO_UNION_SET_PROTOTYPE_(tp, name, bname) \
+	void tp##_##name##_set_##bname(tp##_##name##_t *obj)
+#define AVRO_UNION_SET_PROTOTYPE(tp, name, bname) \
+	AVRO_UNION_SET_PROTOTYPE_(tp, name, bname)
+
+
+/* Define the macros that can be used in SCHEMA_DEFINITION */
+
+#define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last) \
+	AVRO_UNION_SET_PROTOTYPE(tp, name, AVRO_TYPE_NAME(btype, bref)) \
+	{ \
+		if (obj->discriminant != index) { \
+			tp##_##name##_clear(obj); \
+			AVRO_TYPE_INIT(tp, btype, bref, \
+				       branch.AVRO_TYPE_FIELD(btype, bref)); \
+			obj->discriminant = index; \
+		} \
+	}
+
+#define AVRO_FORWARD(tp, type, name)                                  /* nothing */
+#define AVRO_ARRAY(tp, name, itype, iref)                             /* nothing */
+#define AVRO_MAP(tp, name, itype, iref)                               /* nothing */
+#define AVRO_RECORD_START(tp, name)                                   /* nothing */
+#define AVRO_ENUM_START(tp, name)                                     /* nothing */
+#define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
+#define AVRO_ENUM_END(tp, name)                                       /* nothing */
+#define AVRO_FIXED(tp, name, size)                                    /* nothing */
+#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last)  /* nothing */
+#define AVRO_RECORD_END(tp, name)                                     /* nothing */
+#define AVRO_UNION_START(tp, name)                                    /* nothing */
+#define AVRO_UNION_END(tp, name)                                      /* nothing */
+
+
+/* Call SCHEMA_DEFINITION to generate the code */
+
+SCHEMA_DEFINITION()
+
+
+/* Undefine everything when we're done */
+
+#undef AVRO_TYPE_NAME
+#undef AVRO_TYPE_NAME_boolean
+#undef AVRO_TYPE_NAME_bytes
+#undef AVRO_TYPE_NAME_float
+#undef AVRO_TYPE_NAME_double
+#undef AVRO_TYPE_NAME_int
+#undef AVRO_TYPE_NAME_long
+#undef AVRO_TYPE_NAME_null
+#undef AVRO_TYPE_NAME_string
+#undef AVRO_TYPE_NAME_array
+#undef AVRO_TYPE_NAME_enum
+#undef AVRO_TYPE_NAME_fixed
+#undef AVRO_TYPE_NAME_map
+#undef AVRO_TYPE_NAME_record
+#undef AVRO_TYPE_NAME_recursive
+#undef AVRO_TYPE_NAME_union
+
+#undef AVRO_TYPE_FIELD
+#undef AVRO_TYPE_FIELD_boolean
+#undef AVRO_TYPE_FIELD_bytes
+#undef AVRO_TYPE_FIELD_float
+#undef AVRO_TYPE_FIELD_double
+#undef AVRO_TYPE_FIELD_int
+#undef AVRO_TYPE_FIELD_long
+#undef AVRO_TYPE_FIELD_null
+#undef AVRO_TYPE_FIELD_string
+#undef AVRO_TYPE_FIELD_array
+#undef AVRO_TYPE_FIELD_enum
+#undef AVRO_TYPE_FIELD_fixed
+#undef AVRO_TYPE_FIELD_map
+#undef AVRO_TYPE_FIELD_record
+#undef AVRO_TYPE_FIELD_recursive
+#undef AVRO_TYPE_FIELD_union
+
+#undef AVRO_TYPE_INIT
+#undef AVRO_TYPE_INIT_boolean
+#undef AVRO_TYPE_INIT_bytes
+#undef AVRO_TYPE_INIT_float
+#undef AVRO_TYPE_INIT_double
+#undef AVRO_TYPE_INIT_int
+#undef AVRO_TYPE_INIT_long
+#undef AVRO_TYPE_INIT_null
+#undef AVRO_TYPE_INIT_string
+#undef AVRO_TYPE_INIT_array
+#undef AVRO_TYPE_INIT_enum
+#undef AVRO_TYPE_INIT_fixed
+#undef AVRO_TYPE_INIT_map
+#undef AVRO_TYPE_INIT_record
+#undef AVRO_TYPE_INIT_recursive
+#undef AVRO_TYPE_INIT_union
+
+#undef AVRO_UNION_SET_PROTOTYPE
+#undef AVRO_UNION_SET_PROTOTYPE_
+
+#undef AVRO_FORWARD
+#undef AVRO_ARRAY
+#undef AVRO_ENUM_START
+#undef AVRO_ENUM_SYMBOL
+#undef AVRO_ENUM_END
+#undef AVRO_FIXED
+#undef AVRO_MAP
+#undef AVRO_RECORD_START
+#undef AVRO_RECORD_FIELD
+#undef AVRO_RECORD_END
+#undef AVRO_UNION_START
+#undef AVRO_UNION_BRANCH
+#undef AVRO_UNION_END

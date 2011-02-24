@@ -131,3 +131,4 @@
 
 #include <avro/specific/typedef.h.in>
 #include <avro/specific/lifecycle.h.in>
+#include <avro/specific/union.h.in>

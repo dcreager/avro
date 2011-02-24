@@ -33,3 +33,4 @@
 
 #include <avro/specific/init.c.in>
 #include <avro/specific/done.c.in>
+#include <avro/specific/union_set.c.in>
