@@ -68,6 +68,15 @@ void avro_raw_array_done(avro_raw_array_t *array);
 void avro_raw_array_clear(avro_raw_array_t *array);
 
 /**
+ * Ensures that there is enough allocated space to store the given
+ * number of elements in an avro_raw_array_t.  If we can't allocate that
+ * much space, we return ENOMEM.
+ */
+
+int
+avro_raw_array_ensure_size(avro_raw_array_t *array, size_t desired_count);
+
+/**
  * Returns the number of elements in an avro_raw_array_t.
  */
 
@@ -121,6 +130,15 @@ void avro_raw_map_done(avro_raw_map_t *map);
  */
 
 void avro_raw_map_clear(avro_raw_map_t *map);
+
+/**
+ * Ensures that there is enough allocated space to store the given
+ * number of elements in an avro_raw_map_t.  If we can't allocate that
+ * much space, we return ENOMEM.
+ */
+
+int
+avro_raw_map_ensure_size(avro_raw_map_t *map, size_t desired_count);
 
 /**
  * Returns the number of elements in an avro_raw_map_t.

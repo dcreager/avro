@@ -46,7 +46,7 @@ void avro_raw_array_clear(avro_raw_array_t *array)
 }
 
 
-static int
+int
 avro_raw_array_ensure_size(avro_raw_array_t *array, size_t desired_count)
 {
 	size_t  required_size = array->element_size * desired_count;

@@ -48,6 +48,13 @@ void avro_raw_map_clear(avro_raw_map_t *map)
 }
 
 
+int
+avro_raw_map_ensure_size(avro_raw_map_t *map, size_t desired_count)
+{
+	return avro_raw_array_ensure_size(&map->elements, desired_count);
+}
+
+
 void *avro_raw_map_get(avro_raw_map_t *map, const char *key,
 		       unsigned int *index)
 {
