@@ -33,7 +33,31 @@ test_array(void)
 	avro_raw_array_t  array;
 	long  *element;
 
+	/* Test once on a fresh array */
+
 	avro_raw_array_init(&array, sizeof(long));
+	element = avro_raw_array_append(&array);
+	*element = 1;
+	element = avro_raw_array_append(&array);
+	*element = 3;
+
+	if (avro_raw_array_size(&array) != 2) {
+		fprintf(stderr, "Incorrect array size: got %zu, expected %zu.\n",
+			(size_t) avro_raw_array_size(&array),
+			(size_t) 2);
+		return EXIT_FAILURE;
+	}
+
+	if (avro_raw_array_get(&array, long, 0) != 1) {
+		fprintf(stderr, "Unexpected array element %u: got %ld, expected %ld.\n",
+			(unsigned int) 0, avro_raw_array_get(&array, long, 0),
+			(long) 1);
+		return EXIT_FAILURE;
+	}
+
+	/* And test again after clearing the array */
+
+	avro_raw_array_clear(&array);
 	element = avro_raw_array_append(&array);
 	*element = 1;
 	element = avro_raw_array_append(&array);
@@ -65,7 +89,47 @@ test_map(void)
 	long  *element;
 	unsigned int  index;
 
+	/* Test once on a fresh map */
+
 	avro_raw_map_init(&map, sizeof(long));
+	avro_raw_map_get_or_create(&map, "x", (void **) &element, NULL);
+	*element = 1;
+	avro_raw_map_get_or_create(&map, "y", (void **) &element, NULL);
+	*element = 3;
+
+	if (avro_raw_map_size(&map) != 2) {
+		fprintf(stderr, "Incorrect map size: got %zu, expected %zu.\n",
+			(size_t) avro_raw_map_size(&map),
+			(size_t) 2);
+		return EXIT_FAILURE;
+	}
+
+	if (avro_raw_map_get_by_index(&map, long, 0) != 1) {
+		fprintf(stderr, "Unexpected map element %u: got %ld, expected %ld.\n",
+			(unsigned int) 0,
+			avro_raw_map_get_by_index(&map, long, 0),
+			(long) 1);
+		return EXIT_FAILURE;
+	}
+
+	element = avro_raw_map_get(&map, "y", &index);
+	if (index != 1) {
+		fprintf(stderr, "Unexpected index for map element \"%s\": "
+			"got %u, expected %u.\n",
+			"y", index, 1);
+		return EXIT_FAILURE;
+	}
+
+	if (*element != 3) {
+		fprintf(stderr, "Unexpected map element %s: got %ld, expected %ld.\n",
+			"y",
+			*element, (long) 3);
+		return EXIT_FAILURE;
+	}
+
+	/* And test again after clearing the map */
+
+	avro_raw_map_clear(&map);
 	avro_raw_map_get_or_create(&map, "x", (void **) &element, NULL);
 	*element = 1;
 	avro_raw_map_get_or_create(&map, "y", (void **) &element, NULL);

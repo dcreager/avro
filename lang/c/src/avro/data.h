@@ -60,6 +60,14 @@ void avro_raw_array_init(avro_raw_array_t *array, size_t element_size);
 void avro_raw_array_done(avro_raw_array_t *array);
 
 /**
+ * Clears an avro_raw_array_t.  This does not deallocate any space; this
+ * allows us to reuse the underlying array buffer as we start to re-add
+ * elements to the array.
+ */
+
+void avro_raw_array_clear(avro_raw_array_t *array);
+
+/**
  * Returns the number of elements in an avro_raw_array_t.
  */
 
@@ -107,6 +115,12 @@ void avro_raw_map_init(avro_raw_map_t *map, size_t element_size);
  */
 
 void avro_raw_map_done(avro_raw_map_t *map);
+
+/**
+ * Clears an avro_raw_map_t.
+ */
+
+void avro_raw_map_clear(avro_raw_map_t *map);
 
 /**
  * Returns the number of elements in an avro_raw_map_t.
