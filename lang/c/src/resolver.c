@@ -47,18 +47,10 @@ struct avro_resolver_t {
 	/* The reader schema for this resolver. */
 	avro_schema_t  rschema;
 
-	/* An array of any child resolvers needed for the subschemas of
-	 * wschema */
-	avro_consumer_t  **child_resolvers;
-
 	/* If the reader and writer schemas are records, this field
 	 * contains a mapping from writer field indices to reader field
 	 * indices. */
 	int  *index_mapping;
-
-	/* The number of elements in the child_resolvers and
-	 * index_mapping arrays. */
-	size_t  num_children;
 
 	/* If the reader schema is a union, but the writer schema is
 	 * not, this field indicates which branch of the reader union
@@ -67,58 +59,16 @@ struct avro_resolver_t {
 };
 
 
-/**
- * Frees a resolver object, while ensuring that all of the resolvers in
- * a graph of resolvers is only freed once.
- */
-
-static void
-avro_resolver_free_cycles(avro_consumer_t *consumer, st_table *freeing)
-{
-	avro_resolver_t  *resolver = (avro_resolver_t *) consumer;
-
-	/*
-	 * First check if we've already started freeing this resolver.
-	 */
-
-	if (st_lookup(freeing, (st_data_t) resolver, NULL)) {
-		return;
-	}
-
-	/*
-	 * Otherwise add this resolver to the freeing set, and then
-	 * actually free the thing.
-	 */
-
-	st_insert(freeing, (st_data_t) resolver, (st_data_t) NULL);
-
-	avro_schema_decref(resolver->parent.schema);
-	avro_schema_decref(resolver->rschema);
-	if (resolver->child_resolvers) {
-		unsigned int  i;
-		for (i = 0; i < resolver->num_children; i++) {
-			avro_consumer_t  *child = resolver->child_resolvers[i];
-			if (child) {
-				avro_resolver_free_cycles(child, freeing);
-			}
-		}
-		avro_free(resolver->child_resolvers,
-			  sizeof(avro_resolver_t *) * resolver->num_children);
-	}
-	if (resolver->index_mapping) {
-		avro_free(resolver->index_mapping,
-			  sizeof(int) * resolver->num_children);
-	}
-	avro_freet(avro_resolver_t, resolver);
-}
-
-
 static void
 avro_resolver_free(avro_consumer_t *consumer)
 {
-	st_table  *freeing = st_init_numtable();
-	avro_resolver_free_cycles(consumer, freeing);
-	st_free_table(freeing);
+	avro_resolver_t  *resolver = (avro_resolver_t *) consumer;
+	avro_schema_decref(resolver->rschema);
+	if (resolver->index_mapping) {
+		avro_free(resolver->index_mapping,
+			  sizeof(int) * consumer->num_children);
+	}
+	avro_freet(avro_resolver_t, resolver);
 }
 
 /**
@@ -134,7 +84,7 @@ avro_resolver_create(avro_schema_t wschema,
 	avro_resolver_t  *resolver = avro_new(avro_resolver_t);
 	memset(resolver, 0, sizeof(avro_resolver_t));
 
-	resolver->parent.free = avro_resolver_free;
+	resolver->parent.callbacks.free = avro_resolver_free;
 	resolver->parent.schema = avro_schema_incref(wschema);
 	resolver->rschema = avro_schema_incref(rschema);
 	resolver->reader_union_branch = -1;
@@ -354,7 +304,8 @@ try_boolean(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_boolean(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.boolean_value = avro_resolver_boolean_value;
+		(*resolver)->parent.callbacks.boolean_value =
+		    avro_resolver_boolean_value;
 	}
 	return 0;
 }
@@ -390,7 +341,8 @@ try_bytes(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_bytes(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.bytes_value = avro_resolver_bytes_value;
+		(*resolver)->parent.callbacks.bytes_value =
+		    avro_resolver_bytes_value;
 	}
 	return 0;
 }
@@ -415,7 +367,8 @@ try_double(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_double(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.double_value = avro_resolver_double_value;
+		(*resolver)->parent.callbacks.double_value =
+		    avro_resolver_double_value;
 	}
 	return 0;
 }
@@ -451,12 +404,14 @@ try_float(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_float(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.float_value = avro_resolver_float_value;
+		(*resolver)->parent.callbacks.float_value =
+		    avro_resolver_float_value;
 	}
 	else if (is_avro_double(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.float_value = avro_resolver_float_double_value;
+		(*resolver)->parent.callbacks.float_value =
+		    avro_resolver_float_double_value;
 	}
 	return 0;
 }
@@ -514,22 +469,26 @@ try_int(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_int32(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.int_value = avro_resolver_int_value;
+		(*resolver)->parent.callbacks.int_value =
+		    avro_resolver_int_value;
 	}
 	else if (is_avro_int64(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.int_value = avro_resolver_int_long_value;
+		(*resolver)->parent.callbacks.int_value =
+		    avro_resolver_int_long_value;
 	}
 	else if (is_avro_double(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.int_value = avro_resolver_int_double_value;
+		(*resolver)->parent.callbacks.int_value =
+		    avro_resolver_int_double_value;
 	}
 	else if (is_avro_float(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.int_value = avro_resolver_int_float_value;
+		(*resolver)->parent.callbacks.int_value =
+		    avro_resolver_int_float_value;
 	}
 	return 0;
 }
@@ -576,17 +535,20 @@ try_long(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_int64(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.long_value = avro_resolver_long_value;
+		(*resolver)->parent.callbacks.long_value =
+		    avro_resolver_long_value;
 	}
 	else if (is_avro_double(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.long_value = avro_resolver_long_double_value;
+		(*resolver)->parent.callbacks.long_value =
+		    avro_resolver_long_double_value;
 	}
 	else if (is_avro_float(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.long_value = avro_resolver_long_float_value;
+		(*resolver)->parent.callbacks.long_value =
+		    avro_resolver_long_float_value;
 	}
 	return 0;
 }
@@ -612,7 +574,8 @@ try_null(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_null(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.null_value = avro_resolver_null_value;
+		(*resolver)->parent.callbacks.null_value =
+		    avro_resolver_null_value;
 	}
 	return 0;
 }
@@ -639,7 +602,8 @@ try_string(st_table *resolvers, avro_resolver_t **resolver,
 	if (is_avro_string(rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.string_value = avro_resolver_string_value;
+		(*resolver)->parent.callbacks.string_value =
+		    avro_resolver_string_value;
 	}
 	return 0;
 }
@@ -697,7 +661,7 @@ avro_resolver_array_element(avro_consumer_t *consumer,
 	 * children.
 	 */
 
-	*element_consumer = resolver->child_resolvers[0];
+	*element_consumer = consumer->child_consumers[0];
 	*element_user_data = element;
 	return 0;
 }
@@ -739,14 +703,15 @@ try_array(st_table *resolvers, avro_resolver_t **resolver,
 	/*
 	 * The two schemas are compatible, so go ahead and create a
 	 * GavroResolver for the array.  Store the item schema's
-	 * resolver into the child_resolvers field.
+	 * resolver into the child_consumers field.
 	 */
 
-	(*resolver)->num_children = 1;
-	(*resolver)->child_resolvers = avro_calloc(1, sizeof(avro_consumer_t *));
-	(*resolver)->child_resolvers[0] = item_consumer;
-	(*resolver)->parent.array_start_block = avro_resolver_array_start_block;
-	(*resolver)->parent.array_element = avro_resolver_array_element;
+	avro_consumer_allocate_children(&(*resolver)->parent, 1);
+	(*resolver)->parent.child_consumers[0] = item_consumer;
+	(*resolver)->parent.callbacks.array_start_block =
+	    avro_resolver_array_start_block;
+	(*resolver)->parent.callbacks.array_element =
+	    avro_resolver_array_element;
 
 	return 0;
 }
@@ -766,7 +731,8 @@ avro_resolver_enum_value(avro_consumer_t *consumer, int value,
 	avro_datum_t  ud_dest = user_data;
 	avro_datum_t  dest = avro_resolver_get_real_dest(resolver, ud_dest);
 
-	const char  *symbol_name = avro_schema_enum_get(resolver->parent.schema, value);
+	const char  *symbol_name =
+	    avro_schema_enum_get(resolver->parent.schema, value);
 	debug("Storing symbol %s into %p", symbol_name, dest);
 	return avro_enum_set_name(dest, symbol_name);
 }
@@ -788,7 +754,8 @@ try_enum(st_table *resolvers, avro_resolver_t **resolver,
 		if (!strcmp(wname, rname)) {
 			*resolver = avro_resolver_create(wschema, root_rschema);
 			save_resolver(resolvers, *resolver);
-			(*resolver)->parent.enum_value = avro_resolver_enum_value;
+			(*resolver)->parent.callbacks.enum_value =
+			    avro_resolver_enum_value;
 		}
 	}
 	return 0;
@@ -823,7 +790,8 @@ try_fixed(st_table *resolvers, avro_resolver_t **resolver,
 	if (avro_schema_equal(wschema, rschema)) {
 		*resolver = avro_resolver_create(wschema, root_rschema);
 		save_resolver(resolvers, *resolver);
-		(*resolver)->parent.fixed_value = avro_resolver_fixed_value;
+		(*resolver)->parent.callbacks.fixed_value =
+		    avro_resolver_fixed_value;
 	}
 	return 0;
 }
@@ -882,7 +850,7 @@ avro_resolver_map_element(avro_consumer_t *consumer,
 	 * children.
 	 */
 
-	*value_consumer = resolver->child_resolvers[0];
+	*value_consumer = resolver->parent.child_consumers[0];
 	*value_user_data = value;
 	return 0;
 }
@@ -924,14 +892,15 @@ try_map(st_table *resolvers, avro_resolver_t **resolver,
 	/*
 	 * The two schemas are compatible, so go ahead and create a
 	 * GavroResolver for the map.  Store the value schema's
-	 * resolver into the child_resolvers field.
+	 * resolver into the child_consumers field.
 	 */
 
-	(*resolver)->num_children = 1;
-	(*resolver)->child_resolvers = avro_calloc(1, sizeof(avro_consumer_t *));
-	(*resolver)->child_resolvers[0] = value_consumer;
-	(*resolver)->parent.map_start_block = avro_resolver_map_start_block;
-	(*resolver)->parent.map_element = avro_resolver_map_element;
+	avro_consumer_allocate_children(&(*resolver)->parent, 1);
+	(*resolver)->parent.child_consumers[0] = value_consumer;
+	(*resolver)->parent.callbacks.map_start_block =
+	    avro_resolver_map_start_block;
+	(*resolver)->parent.callbacks.map_element =
+	    avro_resolver_map_element;
 
 	return 0;
 }
@@ -983,7 +952,7 @@ avro_resolver_record_field(avro_consumer_t *consumer,
 	debug("Retrieving resolver for writer field %i (%s)",
 	      index, field_name);
 
-	if (!resolver->child_resolvers[index]) {
+	if (!resolver->parent.child_consumers[index]) {
 		debug("Reader doesn't have field %s, skipping", field_name);
 		return 0;
 	}
@@ -996,7 +965,7 @@ avro_resolver_record_field(avro_consumer_t *consumer,
 	avro_datum_t  field = NULL;
 	avro_record_get(dest, field_name, &field);
 
-	*field_consumer = resolver->child_resolvers[index];
+	*field_consumer = resolver->parent.child_consumers[index];
 	*field_user_data = field;
 	return 0;
 }
@@ -1049,7 +1018,7 @@ try_record(st_table *resolvers, avro_resolver_t **resolver,
 
 	debug("Checking writer record schema %s", wname);
 
-	avro_consumer_t  **child_resolvers =
+	avro_consumer_t  **child_consumers =
 	    avro_calloc(wfields, sizeof(avro_consumer_t *));
 	int  *index_mapping = avro_calloc(wfields, sizeof(int));
 
@@ -1102,7 +1071,7 @@ try_record(st_table *resolvers, avro_resolver_t **resolver,
 
 		debug("Found match for field %s (%u in reader, %d in writer)",
 		      field_name, ri, wi);
-		child_resolvers[wi] = field_resolver;
+		child_consumers[wi] = field_resolver;
 		index_mapping[wi] = ri;
 	}
 
@@ -1111,11 +1080,13 @@ try_record(st_table *resolvers, avro_resolver_t **resolver,
 	 * but that's okay — any extras will be ignored.
 	 */
 
-	(*resolver)->num_children = wfields;
-	(*resolver)->child_resolvers = child_resolvers;
+	(*resolver)->parent.num_children = wfields;
+	(*resolver)->parent.child_consumers = child_consumers;
 	(*resolver)->index_mapping = index_mapping;
-	(*resolver)->parent.record_start = avro_resolver_record_start;
-	(*resolver)->parent.record_field = avro_resolver_record_field;
+	(*resolver)->parent.callbacks.record_start =
+	    avro_resolver_record_start;
+	(*resolver)->parent.callbacks.record_field =
+	    avro_resolver_record_field;
 	return 0;
 
 error:
@@ -1129,13 +1100,13 @@ error:
 	{
 		unsigned int  i;
 		for (i = 0; i < wfields; i++) {
-			if (child_resolvers[i]) {
-				avro_consumer_free(child_resolvers[i]);
+			if (child_consumers[i]) {
+				avro_consumer_free(child_consumers[i]);
 			}
 		}
 	}
 
-	avro_free(child_resolvers, wfields * sizeof(avro_consumer_t *));
+	avro_free(child_consumers, wfields * sizeof(avro_consumer_t *));
 	avro_free(index_mapping, wfields * sizeof(int));
 	return EINVAL;
 }
@@ -1161,7 +1132,7 @@ avro_resolver_union_branch(avro_consumer_t *consumer,
 
 	debug("Retrieving resolver for writer branch %u", discriminant);
 
-	if (!resolver->child_resolvers[discriminant]) {
+	if (!resolver->parent.child_consumers[discriminant]) {
 		avro_set_error("Writer union branch %u is incompatible "
 			       "with reader schema \"%s\"",
 			       discriminant, avro_schema_type_name(resolver->rschema));
@@ -1172,7 +1143,7 @@ avro_resolver_union_branch(avro_consumer_t *consumer,
 	 * Return the branch's resolver.
 	 */
 
-	*branch_consumer = resolver->child_resolvers[discriminant];
+	*branch_consumer = resolver->parent.child_consumers[discriminant];
 	*branch_user_data = user_data;
 	return 0;
 }
@@ -1192,7 +1163,7 @@ try_union(st_table *resolvers, avro_schema_t wschema, avro_schema_t rschema)
 	 *
 	 * Regardless of what the reader schema is, for each writer
 	 * branch, we stash away the recursive avro_resolver_t into the
-	 * child_resolvers array.  A NULL entry in this array means that
+	 * child_consumers array.  A NULL entry in this array means that
 	 * that branch isn't compatible with the reader.  This isn't an
 	 * immediate schema resolution error, since we allow
 	 * incompatible branches in the types as long as that branch
@@ -1206,7 +1177,7 @@ try_union(st_table *resolvers, avro_schema_t wschema, avro_schema_t rschema)
 	avro_resolver_t  *resolver = avro_resolver_create(wschema, rschema);
 	save_resolver(resolvers, resolver);
 
-	avro_consumer_t  **child_resolvers =
+	avro_consumer_t  **child_consumers =
 	    avro_calloc(num_branches, sizeof(avro_consumer_t *));
 	int  some_branch_compatible = 0;
 
@@ -1226,9 +1197,9 @@ try_union(st_table *resolvers, avro_schema_t wschema, avro_schema_t rschema)
 		 * appear in the input.
 		 */
 
-		child_resolvers[i] =
+		child_consumers[i] =
 		    avro_resolver_new_memoized(resolvers, branch_schema, rschema);
-		if (child_resolvers[i]) {
+		if (child_consumers[i]) {
 			debug("Found match for writer union branch %u", i);
 			some_branch_compatible = 1;
 		} else {
@@ -1250,9 +1221,10 @@ try_union(st_table *resolvers, avro_schema_t wschema, avro_schema_t rschema)
 		goto error;
 	}
 
-	resolver->num_children = num_branches;
-	resolver->child_resolvers = child_resolvers;
-	resolver->parent.union_branch = avro_resolver_union_branch;
+	resolver->parent.num_children = num_branches;
+	resolver->parent.child_consumers = child_consumers;
+	resolver->parent.callbacks.union_branch =
+	    avro_resolver_union_branch;
 	return &resolver->parent;
 
 error:
@@ -1264,12 +1236,12 @@ error:
 	avro_consumer_free(&resolver->parent);
 
 	for (i = 0; i < num_branches; i++) {
-		if (child_resolvers[i]) {
-			avro_consumer_free(child_resolvers[i]);
+		if (child_consumers[i]) {
+			avro_consumer_free(child_consumers[i]);
 		}
 	}
 
-	avro_free(child_resolvers, num_branches * sizeof(avro_consumer_t *));
+	avro_free(child_consumers, num_branches * sizeof(avro_consumer_t *));
 	return NULL;
 }
 

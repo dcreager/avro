@@ -50,14 +50,9 @@ extern "C" {
  */
 
 typedef struct avro_consumer_t avro_consumer_t;
+typedef struct avro_consumer_callbacks_t avro_consumer_callbacks_t;
 
-struct avro_consumer_t {
-	/**
-	 * The schema of the data that this consumer expects to process.
-	 */
-
-	avro_schema_t  schema;
-
+struct avro_consumer_callbacks_t {
 	/**
 	 * Called when this consumer is freed.  This function should
 	 * free any additional resources acquired by a consumer
@@ -257,14 +252,53 @@ struct avro_consumer_t {
 };
 
 
+struct avro_consumer_t {
+	avro_consumer_callbacks_t  callbacks;
+
+	/**
+	 * The schema of the data that this consumer expects to process.
+	 */
+
+	avro_schema_t  schema;
+
+	/**
+	 * An array of “child” consumers.  Consumer subclasses are free
+	 * to use this array however they wish.  It's okay for there to
+	 * be cycles of references that can be reached through this
+	 * array.  It's also okay for some of the entries in the array
+	 * to be NULL.  The avro_consumer_free function takes care of
+	 * freeing all of the child consumers when this consumer is
+	 * freed; you don't need to do that in your custom free
+	 * callback.
+	 */
+
+	avro_consumer_t  **child_consumers;
+
+	/**
+	 * The size of the child_callbacks array.
+	 */
+
+	size_t  num_children;
+};
+
+
 /**
  * Calls the given callback in consumer, if it's present.  If the
  * callback is NULL, it just returns a success code.
  */
 
-#define avro_consumer_call(consumer, callback, ...)	\
-	(((consumer)->callback == NULL)? 0:		\
-	 (consumer)->callback((consumer), __VA_ARGS__))
+#define avro_consumer_call(consumer, callback, ...) \
+	(((consumer)->callbacks.callback == NULL)? 0: \
+	 (consumer)->callbacks.callback((consumer), __VA_ARGS__))
+
+
+/**
+ * Allocates space for the child_consumers array in a consumer object.
+ */
+
+void
+avro_consumer_allocate_children(avro_consumer_t *consumer,
+				size_t num_children);
 
 
 /**
