@@ -272,5 +272,63 @@ void avro_raw_string_give(avro_raw_string_t *str,
 void avro_raw_string_clear(avro_raw_string_t *str);
 
 
+/*---------------------------------------------------------------------
+ * Memoization
+ */
+
+/**
+ * A specialized map that can be used to memoize the results of a
+ * function.  The API allows you to use two keys as the memoization
+ * keys; if you only need one key, just use NULL for the second key.
+ * The result of the function should be a single pointer, or an integer
+ * that can be cast into a pointer (i.e., an intptr_t).
+ */
+
+typedef struct avro_memoize {
+	void  *cache;
+} avro_memoize_t;
+
+/**
+ * Initialize an avro_memoize_t that you've allocated for yourself.
+ */
+
+void
+avro_memoize_init(avro_memoize_t *mem);
+
+/**
+ * Finalizes an avro_memoize_t.
+ */
+
+void
+avro_memoize_done(avro_memoize_t *mem);
+
+/**
+ * Search for a cached value in an avro_memoize_t.  Returns a boolean
+ * indicating whether there's a value in the cache for the given keys.
+ * If there is, the cached result is placed into @ref result.
+ */
+
+int
+avro_memoize_get(avro_memoize_t *mem,
+		 void *key1, void *key2,
+		 void **result);
+
+/**
+ * Stores a new cached value into an avro_memoize_t, overwriting it if
+ * necessary.
+ */
+
+void
+avro_memoize_set(avro_memoize_t *mem,
+		 void *key1, void *key2,
+		 void *result);
+
+/**
+ * Removes any cached value for the given key from an avro_memoize_t.
+ */
+
+void
+avro_memoize_delete(avro_memoize_t *mem, void *key1, void *key2);
+
 CLOSE_EXTERN
 #endif

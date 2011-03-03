@@ -51,6 +51,7 @@ set(AVRO_SRC
     errors.c
     io.c
     map.c
+    memoize.c
     resolver.c
     schema.c
     schema.h

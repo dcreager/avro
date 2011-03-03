@@ -22,7 +22,7 @@ libavro_la_SOURCES = st.c st.h schema.c schema.h schema_equal.c \
 schema_specific.c \
 datum.c datum_equal.c datum_validate.c datum_read.c datum_skip.c datum_write.c datum_size.c datum.h \
 datum_json.c \
-array.c map.c string.c \
+array.c map.c memoize.c string.c \
 consumer.c resolver.c \
 io.c dump.c dump.h encoding_binary.c \
 allocation.c \
