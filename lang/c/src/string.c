@@ -134,8 +134,8 @@ void avro_raw_string_give(avro_raw_string_t *str,
 }
 
 
-int avro_raw_string_equal(const avro_raw_string_t *str1,
-			  const avro_raw_string_t *str2)
+int avro_raw_string_equals(const avro_raw_string_t *str1,
+			   const avro_raw_string_t *str2)
 {
 	if (str1 == str2) {
 		return 1;

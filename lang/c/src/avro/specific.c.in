@@ -34,6 +34,7 @@
 #include <avro.h>
 #include <avro/consumer.h>
 #include <avro/data.h>
+#include <avro/specific.h>
 
 #include <avro/specific/init.c.in>
 #include <avro/specific/done.c.in>

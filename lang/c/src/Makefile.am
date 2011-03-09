@@ -12,7 +12,9 @@ avro/consumer.h \
 avro/data.h \
 avro/errors.h \
 avro/refcount.h \
-avro/specific.h.in avro/specific.c.in \
+avro/specific.h \
+avro/specific.h.in \
+avro/specific.c.in \
 avro/specific/array.c.in \
 avro/specific/done.c.in \
 avro/specific/init.c.in \
@@ -29,6 +31,7 @@ datum.c datum_equal.c datum_validate.c datum_read.c datum_skip.c datum_write.c d
 datum_json.c \
 array.c map.c memoize.c string.c \
 consumer.c resolver.c \
+raw_compare.c \
 io.c dump.c dump.h encoding_binary.c \
 allocation.c \
 avro_private.h encoding.h datafile.c \

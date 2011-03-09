@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include <avro/data.h>
+#include <avro/specific.h>
 
 /*
  * This file creates a typedef for each schema in the SCHEMA_DEFINITION.
@@ -33,13 +34,13 @@
 
 #define AVRO_TYPE_REF(tp, type, ref)  AVRO_TYPE_REF_##type(tp, ref)
 
-#define AVRO_TYPE_REF_boolean(tp, ref)      int
-#define AVRO_TYPE_REF_bytes(tp, ref)        avro_raw_string_t
-#define AVRO_TYPE_REF_float(tp, ref)        float
-#define AVRO_TYPE_REF_double(tp, ref)       double
-#define AVRO_TYPE_REF_int(tp, ref)          int32_t
-#define AVRO_TYPE_REF_long(tp, ref)         int64_t
-#define AVRO_TYPE_REF_null(tp, ref)         int
+#define AVRO_TYPE_REF_boolean(tp, ref)      avro_raw_boolean_t
+#define AVRO_TYPE_REF_bytes(tp, ref)        avro_raw_bytes_t
+#define AVRO_TYPE_REF_float(tp, ref)        avro_raw_float_t
+#define AVRO_TYPE_REF_double(tp, ref)       avro_raw_double_t
+#define AVRO_TYPE_REF_int(tp, ref)          avro_raw_int_t
+#define AVRO_TYPE_REF_long(tp, ref)         avro_raw_long_t
+#define AVRO_TYPE_REF_null(tp, ref)         avro_raw_null_t
 #define AVRO_TYPE_REF_string(tp, ref)       avro_raw_string_t
 
 #define AVRO_TYPE_REF_array(tp, ref)        tp##_array_##ref##_t

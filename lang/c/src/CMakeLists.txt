@@ -26,6 +26,7 @@ set(AVRO_SRC
     avro/data.h
     avro/errors.h
     avro/refcount.h
+    avro/specific.h
     avro/specific.c.in
     avro/specific.h.in
     avro/specific/done.c.in
@@ -52,6 +53,7 @@ set(AVRO_SRC
     io.c
     map.c
     memoize.c
+    raw_compare.c
     resolver.c
     schema.c
     schema.h

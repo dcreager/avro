@@ -15,13 +15,40 @@
  * permissions and limitations under the License.
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "specific_list.h"
 
 typedef int (*avro_test) (void);
+
+static void
+init_rand(void)
+{
+	srand(time(NULL));
+}
+
+static double
+rand_number(double from, double to)
+{
+	double range = to - from;
+	return from + ((double)rand() / (RAND_MAX + 1.0)) * range;
+}
+
+static int64_t
+rand_long(void)
+{
+	return (int64_t) rand_number(LONG_MIN, LONG_MAX);
+}
+
+static int32_t
+rand_int(void)
+{
+	return (int32_t) rand_number(INT_MIN, INT_MAX);
+}
 
 static int
 test_lifecycle(void)
@@ -42,6 +69,150 @@ test_lifecycle(void)
 
 	specific_list_done(&list);
         return EXIT_SUCCESS;
+}
+
+static int
+test_raw_boolean(void)
+{
+	int  i;
+	for (i = 0; i < 2; i++) {
+		int  value1 = i;
+		int  value2 = i;
+		if (!avro_raw_boolean_equals(&value1, &value2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_bytes(void)
+{
+	avro_raw_string_t  str1;
+	avro_raw_string_init(&str1);
+	avro_raw_string_set_length(&str1, "\xde\xad\xbe\xef", 4);
+
+	avro_raw_string_t  str2;
+	avro_raw_string_init(&str2);
+	avro_raw_string_set_length(&str2, "\xde\xad\xbe\xef", 4);
+
+	if (!avro_raw_bytes_equals(&str1, &str2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_string_done(&str1);
+	avro_raw_string_done(&str2);
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_double(void)
+{
+	int  i;
+	for (i = 0; i < 100; i++) {
+		double  value1 = rand_number(-1e10, 1e10);
+		double  value2 = value1;
+		if (!avro_raw_double_equals(&value1, &value2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_float(void)
+{
+	int  i;
+	for (i = 0; i < 100; i++) {
+		float  value1 = rand_number(-1e10, 1e10);
+		float  value2 = value1;
+		if (!avro_raw_float_equals(&value1, &value2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_int(void)
+{
+	int  i;
+	for (i = 0; i < 100; i++) {
+		int32_t  value1 = rand_int();
+		int32_t  value2 = value1;
+		if (!avro_raw_int_equals(&value1, &value2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_long(void)
+{
+	int  i;
+	for (i = 0; i < 100; i++) {
+		int64_t  value1 = rand_long();
+		int64_t  value2 = value1;
+		if (!avro_raw_long_equals(&value1, &value2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_null(void)
+{
+	int  value1 = 0;
+	int  value2 = 0;
+	if (!avro_raw_null_equals(&value1, &value2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
+}
+
+static int
+test_raw_string(void)
+{
+	const char *strings[] = { "Four score and seven years ago",
+		"our father brought forth on this continent",
+		"a new nation", "conceived in Liberty",
+		"and dedicated to the proposition that all men are created equal."
+	};
+
+	unsigned int  i;
+	for (i = 0; i < sizeof(strings) / sizeof(strings[0]); i++) {
+		avro_raw_string_t  str1;
+		avro_raw_string_init(&str1);
+		avro_raw_string_set(&str1, strings[i]);
+
+		avro_raw_string_t  str2;
+		avro_raw_string_init(&str2);
+		avro_raw_string_set(&str2, strings[i]);
+
+		if (!avro_raw_string_equals(&str1, &str2)) {
+			fprintf(stderr, "Values should be equal.\n");
+			return EXIT_FAILURE;
+		}
+
+		avro_raw_string_done(&str1);
+		avro_raw_string_done(&str2);
+	}
+
+	return EXIT_SUCCESS;
 }
 
 static int
@@ -121,7 +292,7 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
-	if (!avro_raw_string_equal(element, element2)) {
+	if (!avro_raw_string_equals(element, element2)) {
 		fprintf(stderr, "Unexpected value for map element 0.\n");
 		return EXIT_FAILURE;
 	}
@@ -132,7 +303,7 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
-	if (!avro_raw_string_equal(element, element2)) {
+	if (!avro_raw_string_equals(element, element2)) {
 		fprintf(stderr, "Unexpected value for map element \"a\".\n");
 		return EXIT_FAILURE;
 	}
@@ -160,9 +331,19 @@ int main(void)
 		avro_test func;
 	} tests[] = {
 		{ "lifecycle", test_lifecycle },
+		{ "raw_boolean", test_raw_boolean },
+		{ "raw_bytes", test_raw_bytes },
+		{ "raw_double", test_raw_double },
+		{ "raw_float", test_raw_float },
+		{ "raw_int", test_raw_int },
+		{ "raw_long", test_raw_long },
+		{ "raw_null", test_raw_null },
+		{ "raw_string", test_raw_string },
 		{ "array", test_array },
 		{ "map", test_map }
 	};
+
+	init_rand();
 
 	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
 		struct avro_tests *test = tests + i;

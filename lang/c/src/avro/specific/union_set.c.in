@@ -23,6 +23,27 @@
 
 /* Define some helper macros */
 
+
+#define AVRO_TYPE_REF(tp, type, ref)  AVRO_TYPE_REF_##type(tp, ref)
+
+#define AVRO_TYPE_REF_boolean(tp, ref)      avro_raw_boolean_t
+#define AVRO_TYPE_REF_bytes(tp, ref)        avro_raw_bytes_t
+#define AVRO_TYPE_REF_float(tp, ref)        avro_raw_float_t
+#define AVRO_TYPE_REF_double(tp, ref)       avro_raw_double_t
+#define avro_type_ref_int(tp, ref)          avro_raw_int_t
+#define AVRO_TYPE_REF_long(tp, ref)         avro_raw_long_t
+#define AVRO_TYPE_REF_null(tp, ref)         avro_raw_null_t
+#define AVRO_TYPE_REF_string(tp, ref)       avro_raw_string_t
+
+#define AVRO_TYPE_REF_array(tp, ref)        tp##_array_##ref##_t
+#define AVRO_TYPE_REF_enum(tp, ref)         tp##_##ref##_t
+#define AVRO_TYPE_REF_fixed(tp, ref)        tp##_##ref##_t
+#define AVRO_TYPE_REF_map(tp, ref)          tp##_map_##ref##_t
+#define AVRO_TYPE_REF_record(tp, ref)       tp##_##ref##_t
+#define AVRO_TYPE_REF_recursive(tp, ref)    tp##_##ref##_t *
+#define AVRO_TYPE_REF_union(tp, ref)        tp##_##ref##_t
+
+
 #define AVRO_TYPE_NAME(type, ref)  AVRO_TYPE_NAME_##type(ref)
 
 #define AVRO_TYPE_NAME_boolean(ref)         boolean
@@ -123,6 +144,23 @@ SCHEMA_DEFINITION()
 
 
 /* Undefine everything when we're done */
+
+#undef AVRO_TYPE_REF
+#undef AVRO_TYPE_REF_boolean
+#undef AVRO_TYPE_REF_bytes
+#undef AVRO_TYPE_REF_float
+#undef AVRO_TYPE_REF_double
+#undef AVRO_TYPE_REF_int
+#undef AVRO_TYPE_REF_long
+#undef AVRO_TYPE_REF_null
+#undef AVRO_TYPE_REF_string
+#undef AVRO_TYPE_REF_array
+#undef AVRO_TYPE_REF_enum
+#undef AVRO_TYPE_REF_fixed
+#undef AVRO_TYPE_REF_map
+#undef AVRO_TYPE_REF_record
+#undef AVRO_TYPE_REF_recursive
+#undef AVRO_TYPE_REF_union
 
 #undef AVRO_TYPE_NAME
 #undef AVRO_TYPE_NAME_boolean

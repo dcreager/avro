@@ -217,7 +217,7 @@ test_string(void)
 	avro_raw_string_init(&str2);
 	avro_raw_string_set(&str2, "abcd");
 
-	if (!avro_raw_string_equal(&str, &str2)) {
+	if (!avro_raw_string_equals(&str, &str2)) {
 		fprintf(stderr, "Strings should be equal.\n");
 		return EXIT_FAILURE;
 	}
