@@ -94,6 +94,7 @@
 #define AVRO_ARRAY(tp, name, itype, iref) \
 	void tp##_array_##name##_done(tp##_array_##name##_t *obj) \
 	{ \
+		tp##_array_##name##_clear(obj); \
 		avro_raw_array_done(&obj->array); \
 	} \
 	\
@@ -107,6 +108,7 @@
 #define AVRO_MAP(tp, name, itype, iref) \
 	void tp##_map_##name##_done(tp##_map_##name##_t *obj) \
 	{ \
+		tp##_map_##name##_clear(obj); \
 		avro_raw_map_done(&obj->map); \
 	} \
 	\

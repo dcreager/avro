@@ -15,13 +15,37 @@
  * permissions and limitations under the License.
  */
 
+#include <stdint.h>
+
+#include <avro/data.h>
+
 /*
- * This file creates prototypes for the functions that manipulate union
- * values.
+ * This file creates prototypes for the functions that manipulate array,
+ * map, and union values.
  */
 
 
 /* Define some helper macros */
+
+#define AVRO_TYPE_REF(tp, type, ref)  AVRO_TYPE_REF_##type(tp, ref)
+
+#define AVRO_TYPE_REF_boolean(tp, ref)      int
+#define AVRO_TYPE_REF_bytes(tp, ref)        avro_raw_string_t
+#define AVRO_TYPE_REF_float(tp, ref)        float
+#define AVRO_TYPE_REF_double(tp, ref)       double
+#define AVRO_TYPE_REF_int(tp, ref)          int32_t
+#define AVRO_TYPE_REF_long(tp, ref)         int64_t
+#define AVRO_TYPE_REF_null(tp, ref)         int
+#define AVRO_TYPE_REF_string(tp, ref)       avro_raw_string_t
+
+#define AVRO_TYPE_REF_array(tp, ref)        tp##_array_##ref##_t
+#define AVRO_TYPE_REF_enum(tp, ref)         tp##_##ref##_t
+#define AVRO_TYPE_REF_fixed(tp, ref)        tp##_##ref##_t
+#define AVRO_TYPE_REF_map(tp, ref)          tp##_map_##ref##_t
+#define AVRO_TYPE_REF_record(tp, ref)       tp##_##ref##_t
+#define AVRO_TYPE_REF_recursive(tp, ref)    tp##_##ref##_t *
+#define AVRO_TYPE_REF_union(tp, ref)        tp##_##ref##_t
+
 
 #define AVRO_TYPE_NAME(type, ref)  AVRO_TYPE_NAME_##type(ref)
 
@@ -50,6 +74,40 @@
 
 /* Define the macros that can be used in SCHEMA_DEFINITION */
 
+#define AVRO_ARRAY(tp, name, itype, iref) \
+	void \
+	tp##_array_##name##_clear(tp##_array_##name##_t *obj); \
+	\
+	size_t \
+	tp##_array_##name##_size(tp##_array_##name##_t *obj); \
+	\
+	AVRO_TYPE_REF(tp, itype, iref) * \
+	tp##_array_##name##_get(tp##_array_##name##_t *obj, size_t index); \
+	\
+	AVRO_TYPE_REF(tp, itype, iref) * \
+	tp##_array_##name##_append(tp##_array_##name##_t *obj);
+
+
+#define AVRO_MAP(tp, name, itype, iref) \
+	void \
+	tp##_map_##name##_clear(tp##_map_##name##_t *obj); \
+	\
+	size_t \
+	tp##_map_##name##_size(tp##_map_##name##_t *obj); \
+	\
+	AVRO_TYPE_REF(tp, itype, iref) * \
+	tp##_map_##name##_get_by_index(tp##_map_##name##_t *obj, unsigned int index); \
+	\
+	AVRO_TYPE_REF(tp, itype, iref) * \
+	tp##_map_##name##_get(tp##_map_##name##_t *obj, const char *key, \
+			      unsigned int *index); \
+	\
+	int \
+	tp##_map_##name##_get_or_create(tp##_map_##name##_t *obj, const char *key, \
+					AVRO_TYPE_REF(tp, itype, iref) **element, \
+					unsigned int *index);
+
+
 #define AVRO_UNION_START(tp, name) \
 	void tp##_##name##_clear(tp##_##name##_t *obj);
 
@@ -57,8 +115,6 @@
 	AVRO_UNION_SET(tp, name, AVRO_TYPE_NAME(btype, bref))
 
 #define AVRO_FORWARD(tp, type, name)                                  /* nothing */
-#define AVRO_ARRAY(tp, name, itype, iref)                             /* nothing */
-#define AVRO_MAP(tp, name, itype, iref)                               /* nothing */
 #define AVRO_ENUM_START(tp, name)                                     /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
 #define AVRO_ENUM_END(tp, name)                                       /* nothing */
@@ -75,6 +131,23 @@ SCHEMA_DEFINITION()
 
 
 /* Undefine everything when we're done */
+
+#undef AVRO_TYPE_REF
+#undef AVRO_TYPE_REF_boolean
+#undef AVRO_TYPE_REF_bytes
+#undef AVRO_TYPE_REF_float
+#undef AVRO_TYPE_REF_double
+#undef AVRO_TYPE_REF_int
+#undef AVRO_TYPE_REF_long
+#undef AVRO_TYPE_REF_null
+#undef AVRO_TYPE_REF_string
+#undef AVRO_TYPE_REF_array
+#undef AVRO_TYPE_REF_enum
+#undef AVRO_TYPE_REF_fixed
+#undef AVRO_TYPE_REF_map
+#undef AVRO_TYPE_REF_record
+#undef AVRO_TYPE_REF_recursive
+#undef AVRO_TYPE_REF_union
 
 #undef AVRO_TYPE_NAME
 #undef AVRO_TYPE_NAME_boolean

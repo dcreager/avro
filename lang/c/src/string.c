@@ -132,3 +132,22 @@ void avro_raw_string_give(avro_raw_string_t *str,
 	size_t  length = strlen(src);
 	avro_raw_string_give_length(str, src, length+1, free);
 }
+
+
+int avro_raw_string_equal(const avro_raw_string_t *str1,
+			  const avro_raw_string_t *str2)
+{
+	if (str1 == str2) {
+		return 1;
+	}
+
+	if (!str1 || !str2) {
+		return 0;
+	}
+	
+	if (str1->size != str2->size) {
+		return 0;
+	}
+
+	return (memcmp(str1->buf, str2->buf, str1->size) == 0);
+}

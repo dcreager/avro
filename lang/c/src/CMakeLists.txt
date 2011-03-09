@@ -99,16 +99,14 @@ install(DIRECTORY
         ${CMAKE_CURRENT_SOURCE_DIR}/avro
         DESTINATION include
         FILES_MATCHING PATTERN "*.h")
-install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific.c.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific.h.in
-        DESTINATION include/avro)
-install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/done.c.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/init.c.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/lifecycle.h.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/avro/specific/typedef.h.in
-        DESTINATION include/avro/specific)
+install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h.in")
+install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/avro
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.c.in")
 
 install(TARGETS avro-static avro-shared
         RUNTIME DESTINATION bin

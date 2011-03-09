@@ -272,6 +272,14 @@ void avro_raw_string_give(avro_raw_string_t *str,
 void avro_raw_string_clear(avro_raw_string_t *str);
 
 
+/**
+ * Tests two avro_raw_string_t instances for equality.
+ */
+
+int avro_raw_string_equal(const avro_raw_string_t *str1,
+			  const avro_raw_string_t *str2);
+
+
 /*---------------------------------------------------------------------
  * Memoization
  */

@@ -213,7 +213,17 @@ test_string(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_raw_string_t  str2;
+	avro_raw_string_init(&str2);
+	avro_raw_string_set(&str2, "abcd");
+
+	if (!avro_raw_string_equal(&str, &str2)) {
+		fprintf(stderr, "Strings should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
 	avro_raw_string_done(&str);
+	avro_raw_string_done(&str2);
 	return EXIT_SUCCESS;
 }
 

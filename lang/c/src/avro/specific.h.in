@@ -129,6 +129,10 @@
 #error Must provide a SCHEMA_DEFINITION macro.
 #endif
 
+#include <avro.h>
+#include <avro/consumer.h>
+#include <avro/data.h>
+
 #include <avro/specific/typedef.h.in>
 #include <avro/specific/lifecycle.h.in>
-#include <avro/specific/union.h.in>
+#include <avro/specific/accessors.h.in>

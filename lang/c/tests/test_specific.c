@@ -44,6 +44,114 @@ test_lifecycle(void)
         return EXIT_SUCCESS;
 }
 
+static int
+test_array(void)
+{
+	specific_array_double_t  array;
+	specific_array_double_init(&array);
+
+	if (specific_array_double_size(&array) != 0) {
+		fprintf(stderr, "Array should start empty.\n");
+		return EXIT_FAILURE;
+	}
+
+	double  *element = specific_array_double_append(&array);
+	if (element == NULL) {
+		fprintf(stderr, "Cannot append array element.\n");
+		return EXIT_FAILURE;
+	}
+
+	*element = 42.0;
+	double  *element2 = specific_array_double_get(&array, 0);
+	if (element2 == NULL) {
+		fprintf(stderr, "Cannot retrieve array element 0.\n");
+		return EXIT_FAILURE;
+	}
+
+	if (*element != *element2) {
+		fprintf(stderr, "Unexpected value for array element 0.\n");
+		return EXIT_FAILURE;
+	}
+
+	if (specific_array_double_size(&array) != 1) {
+		fprintf(stderr, "Array shouldn't be empty after appending.\n");
+		return EXIT_FAILURE;
+	}
+
+	specific_array_double_clear(&array);
+	if (specific_array_double_size(&array) != 0) {
+		fprintf(stderr, "Array should be empty after clearing.\n");
+		return EXIT_FAILURE;
+	}
+
+	specific_array_double_done(&array);
+	return EXIT_SUCCESS;
+}
+
+static int
+test_map(void)
+{
+	specific_map_string_t  map;
+	specific_map_string_init(&map);
+
+	if (specific_map_string_size(&map) != 0) {
+		fprintf(stderr, "map should start empty.\n");
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_string_t  *element = NULL;
+	unsigned int  index = 0;
+
+	if (!specific_map_string_get_or_create(&map, "a", &element, &index)) {
+		fprintf(stderr, "Cannot append map element.\n");
+		return EXIT_FAILURE;
+	}
+
+	if (index != 0) {
+		fprintf(stderr, "Unexpected index for first map element.\n");
+		return EXIT_FAILURE;
+	}
+
+	avro_raw_string_set(element, "value");
+
+	avro_raw_string_t  *element2 =
+		specific_map_string_get_by_index(&map, 0);
+	if (element2 == NULL) {
+		fprintf(stderr, "Cannot retrieve map element 0.\n");
+		return EXIT_FAILURE;
+	}
+
+	if (!avro_raw_string_equal(element, element2)) {
+		fprintf(stderr, "Unexpected value for map element 0.\n");
+		return EXIT_FAILURE;
+	}
+
+	element2 = specific_map_string_get(&map, "a", NULL);
+	if (element2 == NULL) {
+		fprintf(stderr, "Cannot retrieve map element \"a\".\n");
+		return EXIT_FAILURE;
+	}
+
+	if (!avro_raw_string_equal(element, element2)) {
+		fprintf(stderr, "Unexpected value for map element \"a\".\n");
+		return EXIT_FAILURE;
+	}
+
+	if (specific_map_string_size(&map) != 1) {
+		fprintf(stderr, "map shouldn't be empty after appending.\n");
+		return EXIT_FAILURE;
+	}
+
+	specific_map_string_clear(&map);
+	if (specific_map_string_size(&map) != 0) {
+		fprintf(stderr, "map should be empty after clearing.\n");
+		return EXIT_FAILURE;
+	}
+
+	specific_map_string_done(&map);
+	return EXIT_SUCCESS;
+}
+
 int main(void)
 {
 	unsigned int i;
@@ -51,7 +159,9 @@ int main(void)
 		char *name;
 		avro_test func;
 	} tests[] = {
-		{ "lifecycle", test_lifecycle }
+		{ "lifecycle", test_lifecycle },
+		{ "array", test_array },
+		{ "map", test_map }
 	};
 
 	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

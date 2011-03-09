@@ -12,7 +12,8 @@
         ]
       } },
     { "name": "ip", "type": { "type": "fixed", "name": "ipv4", "size": 4 }},
-    { "name": "attrs", "type": { "type": "map", "values": "string" } },
+    { "name": "scores", "type": { "type": "array", "items": "double" }},
+    { "name": "attrs", "type": { "type": "map", "values": "string" }},
     { "name": "next", "type": ["null", "list"] }
   ]
 }
