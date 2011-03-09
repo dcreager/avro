@@ -21,7 +21,7 @@
 
 #include "avro/allocation.h"
 #include "avro/data.h"
-#include "avro_errors.h"
+#include "avro/errors.h"
 
 
 void avro_raw_array_init(avro_raw_array_t *array, size_t element_size)

@@ -18,7 +18,7 @@
 #ifndef AVRO_ALLOCATION_H
 #define AVRO_ALLOCATION_H
 #include <stdlib.h>
-#include "avro.h"
+#include <avro.h>
 
 struct avro_allocator_state {
 	avro_allocator_t  alloc;

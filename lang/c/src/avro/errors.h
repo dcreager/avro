@@ -18,7 +18,7 @@
 #ifndef AVRO_ERRORS_H
 #define AVRO_ERRORS_H
 
-#include "avro.h"
+#include <avro.h>
 
 void
 avro_set_error(const char *fmt, ...);

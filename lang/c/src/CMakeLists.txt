@@ -24,6 +24,7 @@ set(AVRO_SRC
     avro/allocation.h
     avro/consumer.h
     avro/data.h
+    avro/errors.h
     avro/refcount.h
     avro/specific.c.in
     avro/specific.h.in
@@ -31,7 +32,6 @@ set(AVRO_SRC
     avro/specific/init.c.in
     avro/specific/lifecycle.h.in
     avro/specific/typedef.h.in
-    avro_errors.h
     avro_private.h
     consumer.c
     datafile.c

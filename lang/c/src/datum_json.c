@@ -20,9 +20,9 @@
 #include <string.h>
 
 #include "avro.h"
-#include "avro_errors.h"
 #include "avro_private.h"
 #include "avro/allocation.h"
+#include "avro/errors.h"
 #include "datum.h"
 #include "jansson.h"
 

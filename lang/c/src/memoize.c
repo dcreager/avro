@@ -20,7 +20,7 @@
 
 #include "avro/data.h"
 #include "avro/allocation.h"
-#include "avro_errors.h"
+#include "avro/errors.h"
 #include "avro_private.h"
 #include "st.h"
 

@@ -19,7 +19,7 @@
 
 #include "avro/data.h"
 #include "avro/allocation.h"
-#include "avro_errors.h"
+#include "avro/errors.h"
 
 
 void avro_raw_string_init(avro_raw_string_t *str)

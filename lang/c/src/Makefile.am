@@ -10,6 +10,7 @@ nobase_include_HEADERS = avro.h \
 avro/allocation.h \
 avro/consumer.h \
 avro/data.h \
+avro/errors.h \
 avro/refcount.h \
 avro/specific.h.in avro/specific.c.in \
 avro/specific/array.c.in \
@@ -31,7 +32,7 @@ consumer.c resolver.c \
 io.c dump.c dump.h encoding_binary.c \
 allocation.c \
 avro_private.h encoding.h datafile.c \
-avro_errors.h errors.c
+errors.c
 libavro_la_LIBADD = $(top_builddir)/jansson/src/.libs/libjansson.a
 libavro_la_LDFLAGS = \
         -version-info $(LIBAVRO_VERSION) \

@@ -23,7 +23,7 @@
 #include <string.h>
 
 #include "avro.h"
-#include "avro_errors.h"
+#include "avro/errors.h"
 #include "avro_private.h"
 #include "schema.h"
 #include "st.h"
