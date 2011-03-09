@@ -54,6 +54,7 @@ set(AVRO_SRC
     map.c
     memoize.c
     raw_compare.c
+    raw_resolvers.c
     resolver.c
     schema.c
     schema.h

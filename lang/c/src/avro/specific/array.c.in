@@ -121,7 +121,12 @@
 	AVRO_TYPE_REF(tp, itype, iref) * \
 	tp##_array_##name##_append(tp##_array_##name##_t *obj) \
 	{ \
-		return avro_raw_array_append(&obj->array); \
+		AVRO_TYPE_REF(tp, itype, iref) *elem = \
+		    avro_raw_array_append(&obj->array); \
+		if (elem) { \
+			AVRO_TYPE_INIT(tp, itype, iref, elem); \
+		} \
+		return elem; \
 	}
 
 

@@ -26,6 +26,7 @@ extern "C" {
 
 #include <stdint.h>
 
+#include <avro/consumer.h>
 #include <avro/data.h>
 
 /*---------------------------------------------------------------------
@@ -81,6 +82,41 @@ int
 avro_raw_string_equals(const avro_raw_string_t *val1,
 		       const avro_raw_string_t *val2);
 */
+
+
+/*---------------------------------------------------------------------
+ * “Raw” resolvers
+ *
+ * These functions produce consumer instances that can read data into
+ * “raw” primitive values — that is, directly into the corresponding C
+ * data type.  These are used with the schema-specific classes created
+ * by the avrocc schema compiler.
+ */
+
+
+avro_consumer_t *
+avro_raw_boolean_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_bytes_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_double_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_float_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_int_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_long_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_null_resolver_new(avro_schema_t wschema);
+
+avro_consumer_t *
+avro_raw_string_resolver_new(avro_schema_t wschema);
 
 
 CLOSE_EXTERN

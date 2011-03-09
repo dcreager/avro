@@ -21,6 +21,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "avro.h"
 #include "specific_list.h"
 
 typedef int (*avro_test) (void);
@@ -48,6 +49,44 @@ static int32_t
 rand_int(void)
 {
 	return (int32_t) rand_number(INT_MIN, INT_MAX);
+}
+
+static char buf[4096];
+
+#define write_read_test(datum, val, expected, basename) \
+{ \
+	avro_reader_t  reader = avro_reader_memory(buf, sizeof(buf)); \
+	avro_writer_t  writer = avro_writer_memory(buf, sizeof(buf)); \
+	\
+	avro_schema_t  wschema = avro_datum_get_schema(datum); \
+	\
+	if (avro_write_data(writer, NULL, datum)) { \
+		fprintf(stderr, "Unable to write: %s\n", \
+			avro_strerror()); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	avro_consumer_t  *consumer = basename##_resolver_new(wschema); \
+	if (!consumer) { \
+		fprintf(stderr, "Couldn't create consumer: %s\n", \
+			avro_strerror()); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	if (avro_consume_binary(reader, consumer, &val)) { \
+		fprintf(stderr, "Unable to read: %s\n", \
+			avro_strerror()); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	if (!basename##_equals(&val, &expected)) { \
+		fprintf(stderr, "Roundtrip value doesn't match\n"); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	avro_consumer_free(consumer); \
+	avro_reader_free(reader); \
+	avro_writer_free(writer); \
 }
 
 static int
@@ -82,6 +121,9 @@ test_raw_boolean(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+		avro_datum_t  datum = avro_boolean(i);
+		write_read_test(datum, value1, value2, avro_raw_boolean);
+		avro_datum_decref(datum);
 	}
 
 	return EXIT_SUCCESS;
@@ -103,6 +145,10 @@ test_raw_bytes(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_datum_t  datum = avro_bytes("\xde\xad\xbe\xef", 4);
+	write_read_test(datum, str1, str2, avro_raw_bytes);
+	avro_datum_decref(datum);
+
 	avro_raw_string_done(&str1);
 	avro_raw_string_done(&str2);
 	return EXIT_SUCCESS;
@@ -119,6 +165,9 @@ test_raw_double(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+		avro_datum_t  datum = avro_double(value1);
+		write_read_test(datum, value1, value2, avro_raw_double);
+		avro_datum_decref(datum);
 	}
 
 	return EXIT_SUCCESS;
@@ -135,6 +184,9 @@ test_raw_float(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+		avro_datum_t  datum = avro_float(value1);
+		write_read_test(datum, value1, value2, avro_raw_float);
+		avro_datum_decref(datum);
 	}
 
 	return EXIT_SUCCESS;
@@ -151,6 +203,9 @@ test_raw_int(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+		avro_datum_t  datum = avro_int32(value1);
+		write_read_test(datum, value1, value2, avro_raw_int);
+		avro_datum_decref(datum);
 	}
 
 	return EXIT_SUCCESS;
@@ -167,6 +222,9 @@ test_raw_long(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+		avro_datum_t  datum = avro_int64(value1);
+		write_read_test(datum, value1, value2, avro_raw_long);
+		avro_datum_decref(datum);
 	}
 
 	return EXIT_SUCCESS;
@@ -181,6 +239,11 @@ test_raw_null(void)
 		fprintf(stderr, "Values should be equal.\n");
 		return EXIT_FAILURE;
 	}
+
+	avro_datum_t  datum = avro_null();
+	write_read_test(datum, value1, value2, avro_raw_null);
+	avro_datum_decref(datum);
+
 	return EXIT_SUCCESS;
 }
 
@@ -207,6 +270,10 @@ test_raw_string(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
+		avro_datum_t  datum = avro_string(strings[i]);
+		write_read_test(datum, str1, str2, avro_raw_string);
+		avro_datum_decref(datum);
 
 		avro_raw_string_done(&str1);
 		avro_raw_string_done(&str2);

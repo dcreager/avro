@@ -31,7 +31,7 @@ datum.c datum_equal.c datum_validate.c datum_read.c datum_skip.c datum_write.c d
 datum_json.c \
 array.c map.c memoize.c string.c \
 consumer.c resolver.c \
-raw_compare.c \
+raw_compare.c raw_resolvers.c \
 io.c dump.c dump.h encoding_binary.c \
 allocation.c \
 avro_private.h encoding.h datafile.c \

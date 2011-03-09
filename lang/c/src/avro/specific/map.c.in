@@ -134,8 +134,17 @@
 					AVRO_TYPE_REF(tp, itype, iref) **element, \
 					unsigned int *index) \
 	{ \
-		return avro_raw_map_get_or_create \
-		    (&obj->map, key, (void **) element, index); \
+		AVRO_TYPE_REF(tp, itype, iref) *elem = NULL; \
+		int rval = \
+		    avro_raw_map_get_or_create \
+		    (&obj->map, key, (void **) &elem, index); \
+		if (rval) { \
+			AVRO_TYPE_INIT(tp, itype, iref, elem); \
+		} \
+		if (rval >= 0) { \
+			*element = elem; \
+		} \
+		return rval; \
 	}
 
 
