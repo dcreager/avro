@@ -80,10 +80,10 @@
 	tp##_array_##name##_clear(tp##_array_##name##_t *obj); \
 	\
 	size_t \
-	tp##_array_##name##_size(tp##_array_##name##_t *obj); \
+	tp##_array_##name##_size(const tp##_array_##name##_t *obj); \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_array_##name##_get(tp##_array_##name##_t *obj, size_t index); \
+	tp##_array_##name##_get(const tp##_array_##name##_t *obj, size_t index); \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
 	tp##_array_##name##_append(tp##_array_##name##_t *obj);
@@ -94,13 +94,15 @@
 	tp##_map_##name##_clear(tp##_map_##name##_t *obj); \
 	\
 	size_t \
-	tp##_map_##name##_size(tp##_map_##name##_t *obj); \
+	tp##_map_##name##_size(const tp##_map_##name##_t *obj); \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_map_##name##_get_by_index(tp##_map_##name##_t *obj, unsigned int index); \
+	tp##_map_##name##_get_by_index(const tp##_map_##name##_t *obj, \
+				       unsigned int index); \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_map_##name##_get(tp##_map_##name##_t *obj, const char *key, \
+	tp##_map_##name##_get(const tp##_map_##name##_t *obj, \
+			      const char *key, \
 			      unsigned int *index); \
 	\
 	int \

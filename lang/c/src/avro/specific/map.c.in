@@ -60,8 +60,7 @@
 
 #define AVRO_TYPE_INIT_array(tp, ref, name)      tp##_array_##ref##_init(name)
 #define AVRO_TYPE_INIT_enum(tp, ref, name)       *name = 0
-#define AVRO_TYPE_INIT_fixed(tp, ref, name) \
-	memset(name, 0, sizeof(AVRO_TYPE_REF_fixed(tp, ref)))
+#define AVRO_TYPE_INIT_fixed(tp, ref, name)      tp##_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_map(tp, ref, name)        tp##_map_##ref##_init(name)
 #define AVRO_TYPE_INIT_record(tp, ref, name)     tp##_##ref##_init(name)
 #define AVRO_TYPE_INIT_recursive(tp, ref, name)  *name = tp##_##ref##_new()
@@ -81,7 +80,7 @@
 
 #define AVRO_TYPE_DONE_array(tp, ref, name)      tp##_array_##ref##_done(name)
 #define AVRO_TYPE_DONE_enum(tp, ref, name)       (void) name
-#define AVRO_TYPE_DONE_fixed(tp, ref, name)      (void) name
+#define AVRO_TYPE_DONE_fixed(tp, ref, name)      tp##_##ref##_done(&obj->name)
 #define AVRO_TYPE_DONE_map(tp, ref, name)        tp##_map_##ref##_done(name)
 #define AVRO_TYPE_DONE_record(tp, ref, name)     tp##_##ref##_done(name)
 #define AVRO_TYPE_DONE_recursive(tp, ref, name) \
@@ -107,13 +106,13 @@
 	} \
 	\
 	size_t \
-	tp##_map_##name##_size(tp##_map_##name##_t *obj) \
+	tp##_map_##name##_size(const tp##_map_##name##_t *obj) \
 	{ \
 		return avro_raw_map_size(&obj->map); \
 	} \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_map_##name##_get_by_index(tp##_map_##name##_t *obj, \
+	tp##_map_##name##_get_by_index(const tp##_map_##name##_t *obj, \
 				       unsigned int index) \
 	{ \
 		return &avro_raw_map_get_by_index \
@@ -122,7 +121,7 @@
 	} \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_map_##name##_get(tp##_map_##name##_t *obj, \
+	tp##_map_##name##_get(const tp##_map_##name##_t *obj, \
 			      const char *key, unsigned int *index) \
 	{ \
 		return avro_raw_map_get(&obj->map, key, index); \

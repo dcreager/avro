@@ -129,11 +129,18 @@
 #error Must provide a SCHEMA_DEFINITION macro.
 #endif
 
+#include <errno.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <avro.h>
 #include <avro/consumer.h>
 #include <avro/data.h>
+#include <avro/errors.h>
 #include <avro/specific.h>
 
 #include <avro/specific/typedef.h.in>
 #include <avro/specific/lifecycle.h.in>
 #include <avro/specific/accessors.h.in>
+#include <avro/specific/comparison.h.in>

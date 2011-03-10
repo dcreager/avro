@@ -16,11 +16,13 @@ avro/specific.h \
 avro/specific.h.in \
 avro/specific.c.in \
 avro/specific/array.c.in \
+avro/specific/comparison.c.in \
 avro/specific/done.c.in \
 avro/specific/init.c.in \
 avro/specific/map.c.in \
 avro/specific/union_set.c.in \
 avro/specific/accessors.h.in \
+avro/specific/comparison.h.in \
 avro/specific/lifecycle.h.in \
 avro/specific/typedef.h.in
 

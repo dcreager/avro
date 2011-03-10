@@ -11,6 +11,9 @@
           { "name": "y", "type": "int" }
         ]
       } },
+    { "name": "scheme", "type":
+      { "type": "enum", "name": "scheme",
+        "symbols": [ "POLAR", "RECTANGULAR" ] }},
     { "name": "ip", "type": { "type": "fixed", "name": "ipv4", "size": 4 }},
     { "name": "scores", "type": { "type": "array", "items": "double" }},
     { "name": "attrs", "type": { "type": "map", "values": "string" }},

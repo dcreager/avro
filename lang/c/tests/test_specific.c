@@ -98,7 +98,7 @@ test_lifecycle(void)
         list.point.x = 5;
         list.point.y = 2;
 
-        memcpy(list.ip, "\xc0\xa8\x00\x01", sizeof(list.ip));
+        memcpy(list.ip.contents, "\xc0\xa8\x00\x01", sizeof(list.ip.contents));
 
 	specific_null_list_set_list(&list.next);
         list.next.branch.list->point.x = 1;
@@ -316,6 +316,16 @@ test_array(void)
 		return EXIT_FAILURE;
 	}
 
+	specific_array_double_t  array2;
+	specific_array_double_init(&array2);
+	element = specific_array_double_append(&array2);
+	*element = 42.0;
+
+	if (!specific_array_double_equals(&array, &array2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
 	specific_array_double_clear(&array);
 	if (specific_array_double_size(&array) != 0) {
 		fprintf(stderr, "Array should be empty after clearing.\n");
@@ -323,6 +333,35 @@ test_array(void)
 	}
 
 	specific_array_double_done(&array);
+	specific_array_double_done(&array2);
+	return EXIT_SUCCESS;
+}
+
+static int
+test_enum(void)
+{
+	specific_scheme_t  value1 = SPECIFIC_SCHEME_RECTANGULAR;
+	specific_scheme_t  value2 = SPECIFIC_SCHEME_RECTANGULAR;
+
+	if (!specific_scheme_equals(&value1, &value2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int
+test_fixed(void)
+{
+	specific_ipv4_t  value1 = {{ 0xDE, 0xAD, 0xBE, 0xEF }};
+	specific_ipv4_t  value2 = {{ 0xDE, 0xAD, 0xBE, 0xEF }};
+
+	if (!specific_ipv4_equals(&value1, &value2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
 	return EXIT_SUCCESS;
 }
 
@@ -380,6 +419,16 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
+	specific_map_string_t  map2;
+	specific_map_string_init(&map2);
+	specific_map_string_get_or_create(&map2, "a", &element, NULL);
+	avro_raw_string_set(element, "value");
+
+	if (!specific_map_string_equals(&map, &map2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
 	specific_map_string_clear(&map);
 	if (specific_map_string_size(&map) != 0) {
 		fprintf(stderr, "map should be empty after clearing.\n");
@@ -387,7 +436,43 @@ test_map(void)
 	}
 
 	specific_map_string_done(&map);
+	specific_map_string_done(&map2);
 	return EXIT_SUCCESS;
+}
+
+static int
+test_nested(void)
+{
+	specific_list_t  list1;
+	specific_list_init(&list1);
+        list1.point.x = 5;
+        list1.point.y = 2;
+        memcpy(list1.ip.contents,
+	       "\xc0\xa8\x00\x01", sizeof(list1.ip.contents));
+	specific_null_list_set_list(&list1.next);
+        list1.next.branch.list->point.x = 1;
+        list1.next.branch.list->point.y = 1;
+	specific_null_list_set_null(&list1.next.branch.list->next);
+
+	specific_list_t  list2;
+	specific_list_init(&list2);
+        list2.point.x = 5;
+        list2.point.y = 2;
+        memcpy(list2.ip.contents,
+	       "\xc0\xa8\x00\x01", sizeof(list2.ip.contents));
+	specific_null_list_set_list(&list2.next);
+        list2.next.branch.list->point.x = 1;
+        list2.next.branch.list->point.y = 1;
+	specific_null_list_set_null(&list2.next.branch.list->next);
+
+	if (!specific_list_equals(&list1, &list2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
+	specific_list_done(&list1);
+	specific_list_done(&list2);
+        return EXIT_SUCCESS;
 }
 
 int main(void)
@@ -407,7 +492,10 @@ int main(void)
 		{ "raw_null", test_raw_null },
 		{ "raw_string", test_raw_string },
 		{ "array", test_array },
-		{ "map", test_map }
+		{ "enum", test_enum },
+		{ "fixed", test_fixed },
+		{ "map", test_map },
+		{ "nested", test_nested }
 	};
 
 	init_rand();

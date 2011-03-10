@@ -77,7 +77,7 @@
 #define AVRO_FORWARD_enum(tp, name) \
 	typedef enum tp##_##name  tp##_##name##_t;
 #define AVRO_FORWARD_fixed(tp, name) \
-	/* no forward declaration for a fixed */
+	typedef struct tp##_##name  tp##_##name##_t;
 #define AVRO_FORWARD_map(tp, name) \
 	typedef struct tp##_map_##name  tp##_map_##name##_t;
 #define AVRO_FORWARD_record(tp, name) \
@@ -108,7 +108,9 @@
 
 
 #define AVRO_FIXED(tp, name, size) \
-	typedef uint8_t  tp##_##name##_t[size];
+	struct tp##_##name { \
+		uint8_t  contents[size]; \
+	};
 
 
 #define AVRO_MAP(tp, name, vtype, vref) \

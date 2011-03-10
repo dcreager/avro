@@ -97,8 +97,7 @@
 
 #define AVRO_TYPE_INIT_array(tp, ref, name)      tp##_array_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_enum(tp, ref, name)       obj->name = 0
-#define AVRO_TYPE_INIT_fixed(tp, ref, name) \
-	memset(obj->name, 0, sizeof(AVRO_TYPE_REF_fixed(tp, ref)))
+#define AVRO_TYPE_INIT_fixed(tp, ref, name)      tp##_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_map(tp, ref, name)        tp##_map_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_record(tp, ref, name)     tp##_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_recursive(tp, ref, name)  obj->name = tp##_##ref##_new()

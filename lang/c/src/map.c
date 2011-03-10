@@ -55,7 +55,7 @@ avro_raw_map_ensure_size(avro_raw_map_t *map, size_t desired_count)
 }
 
 
-void *avro_raw_map_get(avro_raw_map_t *map, const char *key,
+void *avro_raw_map_get(const avro_raw_map_t *map, const char *key,
 		       unsigned int *index)
 {
 	st_data_t  data;

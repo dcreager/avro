@@ -61,8 +61,7 @@
 
 #define AVRO_TYPE_INIT_array(tp, ref, name)      tp##_array_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_enum(tp, ref, name)       obj->name = 0
-#define AVRO_TYPE_INIT_fixed(tp, ref, name) \
-	memset(obj->name, 0, sizeof(AVRO_TYPE_REF_fixed(tp, ref)))
+#define AVRO_TYPE_INIT_fixed(tp, ref, name)      tp##_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_map(tp, ref, name)        tp##_map_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_record(tp, ref, name)     tp##_##ref##_init(&obj->name)
 #define AVRO_TYPE_INIT_recursive(tp, ref, name)  obj->name = NULL
@@ -83,6 +82,20 @@
 		tp##_array_##name##_t *obj = \
 		    avro_new(AVRO_TYPE_REF_array(tp, name)); \
 		if (obj) { tp##_array_##name##_init(obj); } \
+		return obj; \
+	}
+
+#define AVRO_FIXED(tp, name, size) \
+	void tp##_##name##_init(tp##_##name##_t *obj) \
+	{ \
+		memset(obj->contents, 0, size); \
+	} \
+	\
+	tp##_##name##_t *tp##_##name##_new(void) \
+	{ \
+		tp##_##name##_t *obj = \
+		    avro_new(AVRO_TYPE_REF_fixed(tp, name)); \
+		if (obj) { tp##_##name##_init(obj); } \
 		return obj; \
 	}
 
@@ -132,7 +145,7 @@
 	tp##_##name##_t *tp##_##name##_new(void) \
 	{ \
 		tp##_##name##_t *obj = \
-		    avro_malloc(sizeof(AVRO_TYPE_REF_union(tp, name))); \
+		    avro_new(AVRO_TYPE_REF_union(tp, name)); \
 		if (obj) { tp##_##name##_init(obj); } \
 		return obj; \
 	}
@@ -142,7 +155,6 @@
 #define AVRO_ENUM_START(tp, name)                                     /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
 #define AVRO_ENUM_END(tp, name)                                       /* nothing */
-#define AVRO_FIXED(tp, name, size)                                    /* nothing */
 #define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last)  /* nothing */
 #define AVRO_UNION_END(tp, name)                                      /* nothing */
 
