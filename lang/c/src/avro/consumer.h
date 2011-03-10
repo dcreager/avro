@@ -275,6 +275,12 @@ struct avro_consumer_t {
 	avro_consumer_t  **child_consumers;
 
 	/**
+	 * An array of user_data pointers for the child consumers.
+	 */
+
+	void  **child_user_data;
+
+	/**
 	 * The size of the child_callbacks array.
 	 */
 

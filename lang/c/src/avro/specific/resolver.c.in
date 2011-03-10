@@ -1,0 +1,487 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+#include <errno.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <avro.h>
+#include <avro/consumer.h>
+#include <avro/data.h>
+#include <avro/errors.h>
+
+/*
+ * This file creates implementations for the functions that create a
+ * resolver for a schema type.
+ */
+
+/* Define some helper macros */
+
+#define AVRO_CONSUMER(tp, type, ref)  AVRO_CONSUMER_##type(tp, ref)
+
+#define AVRO_CONSUMER_boolean(tp, ref)      avro_raw_boolean_resolver_new
+#define AVRO_CONSUMER_bytes(tp, ref)        avro_raw_bytes_resolver_new
+#define AVRO_CONSUMER_float(tp, ref)        avro_raw_float_resolver_new
+#define AVRO_CONSUMER_double(tp, ref)       avro_raw_double_resolver_new
+#define AVRO_CONSUMER_int(tp, ref)          avro_raw_int_resolver_new
+#define AVRO_CONSUMER_long(tp, ref)         avro_raw_long_resolver_new
+#define AVRO_CONSUMER_null(tp, ref)         avro_raw_null_resolver_new
+#define AVRO_CONSUMER_string(tp, ref)       avro_raw_string_resolver_new
+
+#define AVRO_CONSUMER_array(tp, ref)        tp##_array_##ref##_resolver_new
+#define AVRO_CONSUMER_enum(tp, ref)         tp##_##ref##_resolver_new
+#define AVRO_CONSUMER_fixed(tp, ref)        tp##_##ref##_resolver_new
+#define AVRO_CONSUMER_map(tp, ref)          tp##_map_##ref##_resolver_new
+#define AVRO_CONSUMER_record(tp, ref)       tp##_##ref##_resolver_new
+#define AVRO_CONSUMER_recursive(tp, ref)    tp##_##ref##_resolver_new
+#define AVRO_CONSUMER_union(tp, ref)        tp##_##ref##_resolver_new
+
+
+#define AVRO_NEW(name) \
+	avro_consumer_t * \
+	name##_resolver_new(avro_schema_t wschema) \
+	{ \
+		avro_memoize_t  mem; \
+		avro_memoize_init(&mem); \
+		avro_consumer_t  *result = name##_resolver_memoized(&mem, wschema); \
+		avro_memoize_done(&mem); \
+		return result; \
+	}
+
+#define AVRO_MEMOIZE_KEY(name) \
+	static int  name##_memoize_key = 0;
+
+#define AVRO_CHECK_MEMOIZE(name) \
+	if (avro_memoize_get(mem, &name##_memoize_key, \
+			     wschema, (void **) &result)) { \
+		return result; \
+	}
+
+#define AVRO_SET_MEMOIZE(name) \
+	avro_memoize_set(mem, &name##_memoize_key, wschema, result);
+
+#define AVRO_DELETE_MEMOIZE(name) \
+	avro_memoize_delete(mem, &name##_memoize_key, wschema);
+
+
+/* Define the macros that can be used in SCHEMA_DEFINITION */
+
+#define AVRO_ARRAY(tp, name, itype, iref) \
+	static int \
+	tp##_array_##name##_start_block(avro_consumer_t *consumer, \
+					int is_first_block, \
+					unsigned int block_count, \
+					void *user_data) \
+	{ \
+		(void) consumer; \
+		avro_raw_array_t *array = user_data; \
+		if (is_first_block) { \
+			avro_raw_array_clear(array); \
+		} \
+		size_t current_size = avro_raw_array_size(array); \
+		return avro_raw_array_ensure_size(array, current_size + block_count); \
+	} \
+	\
+	static int \
+	tp##_array_##name##_array_element(avro_consumer_t *consumer, \
+					  unsigned int index, \
+					  avro_consumer_t **element_consumer, \
+					  void **element_user_data, \
+					  void *user_data) \
+	{ \
+		(void) consumer; \
+		(void) index; \
+		tp##_array_##name##_t  *obj = user_data; \
+		avro_raw_array_t *array = &obj->array; \
+		*element_consumer = consumer->child_consumers[0]; \
+		*element_user_data = avro_raw_array_append(array); \
+		if (*element_user_data == NULL) { \
+			return ENOMEM; \
+		} \
+		return 0; \
+	} \
+	\
+	AVRO_MEMOIZE_KEY(tp##_array_##name); \
+	\
+	avro_consumer_t * \
+	tp##_array_##name##_resolver_memoized(avro_memoize_t *mem, \
+					    avro_schema_t wschema) \
+	{ \
+		if (!is_avro_array(wschema)) { \
+			avro_set_error("Cannot store %s into array", \
+				       avro_schema_type_name(wschema)); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_array_##name); \
+		\
+		result = avro_new(avro_consumer_t); \
+		memset(result, 0, sizeof(avro_consumer_t)); \
+		result->schema = avro_schema_incref(wschema); \
+		AVRO_SET_MEMOIZE(tp##_array_##name); \
+		\
+		avro_schema_t  witems = avro_schema_array_items(wschema); \
+		avro_consumer_t  *item_consumer = \
+		    AVRO_CONSUMER(tp, itype, iref)(witems); \
+		if (!item_consumer) { \
+			AVRO_DELETE_MEMOIZE(tp##_array_##name); \
+			avro_consumer_free(result); \
+			avro_prefix_error("Array items aren't compatible: "); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_allocate_children(result, 1); \
+		result->child_consumers[0] = item_consumer; \
+		result->callbacks.array_start_block = \
+		    tp##_array_##name##_start_block; \
+		result->callbacks.array_element = \
+		    tp##_array_##name##_array_element; \
+		\
+		return result; \
+	} \
+	\
+	AVRO_NEW(tp##_array_##name)
+
+
+#define AVRO_ENUM_START(tp, name) \
+	static int \
+	tp##_##name##_enum_value(avro_consumer_t *consumer, \
+				 int value, void *user_data) \
+	{ \
+		(void) consumer; \
+		tp##_##name##_t  *obj = user_data; \
+		*obj = value; \
+		return 0; \
+	} \
+	\
+	AVRO_MEMOIZE_KEY(tp##_##name); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		if (!is_avro_enum(wschema)) { \
+			avro_set_error("Cannot store %s into enum", \
+				       avro_schema_type_name(wschema)); \
+			return NULL; \
+		} \
+		\
+		const char  *wname = avro_schema_name(wschema); \
+		if (strcmp(wname, #name) != 0) { \
+			avro_set_error("Enum names don't match"); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		\
+		result = avro_new(avro_consumer_t); \
+		memset(result, 0, sizeof(avro_consumer_t)); \
+		result->schema = avro_schema_incref(wschema); \
+		AVRO_SET_MEMOIZE(tp##_##name); \
+		\
+		result->callbacks.enum_value = tp##_##name##_enum_value; \
+		\
+		return result; \
+	} \
+	\
+	AVRO_NEW(tp##_##name)
+
+
+#define AVRO_FIXED(tp, name, size) \
+	static int \
+	tp##_##name##_fixed_value(avro_consumer_t *consumer, \
+				  const void *value, size_t value_len, \
+				  void *user_data) \
+	{ \
+		(void) consumer; \
+		(void) value_len; \
+		tp##_##name##_t  *obj = user_data; \
+		memcpy(obj->contents, value, size); \
+		return 0; \
+	} \
+	\
+	AVRO_MEMOIZE_KEY(tp##_##name); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		if (!is_avro_fixed(wschema)) { \
+			avro_set_error("Cannot store %s into fixed", \
+				       avro_schema_type_name(wschema)); \
+			return NULL; \
+		} \
+		\
+		const char  *wname = avro_schema_name(wschema); \
+		if (strcmp(wname, #name) != 0) { \
+			avro_set_error("Fixed names don't match"); \
+			return NULL; \
+		} \
+		\
+		if (avro_schema_fixed_size(wschema) != size) { \
+			avro_set_error("Fixed sized don't match"); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		\
+		result = avro_new(avro_consumer_t); \
+		memset(result, 0, sizeof(avro_consumer_t)); \
+		result->schema = avro_schema_incref(wschema); \
+		AVRO_SET_MEMOIZE(tp##_##name); \
+		\
+		result->callbacks.fixed_value = tp##_##name##_fixed_value; \
+		\
+		return result; \
+	} \
+	\
+	AVRO_NEW(tp##_##name)
+
+
+#define AVRO_MAP(tp, name, itype, iref) \
+	static int \
+	tp##_map_##name##_start_block(avro_consumer_t *consumer, \
+				      int is_first_block, \
+				      unsigned int block_count, \
+				      void *user_data) \
+	{ \
+		(void) consumer; \
+		avro_raw_map_t *map = user_data; \
+		if (is_first_block) { \
+			avro_raw_map_clear(map); \
+		} \
+		size_t current_size = avro_raw_map_size(map); \
+		return avro_raw_map_ensure_size(map, current_size + block_count); \
+	} \
+	\
+	static int \
+	tp##_map_##name##_map_element(avro_consumer_t *consumer, \
+				      unsigned int index, \
+				      const char *key, \
+				      avro_consumer_t **element_consumer, \
+				      void **element_user_data, \
+				      void *user_data) \
+	{ \
+		(void) consumer; \
+		(void) index; \
+		int rval; \
+		tp##_map_##name##_t  *obj = user_data; \
+		avro_raw_map_t *map = &obj->map; \
+		*element_consumer = consumer->child_consumers[0]; \
+		rval = avro_raw_map_get_or_create(map, key, element_user_data, NULL); \
+		if (rval < 0) { \
+			return -rval; \
+		} \
+		return 0; \
+	} \
+	\
+	AVRO_MEMOIZE_KEY(tp##_map_##name); \
+	\
+	avro_consumer_t * \
+	tp##_map_##name##_resolver_memoized(avro_memoize_t *mem, \
+					    avro_schema_t wschema) \
+	{ \
+		if (!is_avro_map(wschema)) { \
+			avro_set_error("Cannot store %s into map", \
+				       avro_schema_type_name(wschema)); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_map_##name); \
+		\
+		result = avro_new(avro_consumer_t); \
+		memset(result, 0, sizeof(avro_consumer_t)); \
+		result->schema = avro_schema_incref(wschema); \
+		AVRO_SET_MEMOIZE(tp##_map_##name); \
+		\
+		avro_schema_t  wvalues = avro_schema_map_values(wschema); \
+		avro_consumer_t  *value_consumer = \
+		    AVRO_CONSUMER(tp, itype, iref)(wvalues); \
+		if (!value_consumer) { \
+			AVRO_DELETE_MEMOIZE(tp##_map_##name); \
+			avro_consumer_free(result); \
+			avro_prefix_error("Map values aren't compatible: "); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_allocate_children(result, 1); \
+		result->child_consumers[0] = value_consumer; \
+		result->callbacks.map_start_block = \
+		    tp##_map_##name##_start_block; \
+		result->callbacks.map_element = \
+		    tp##_map_##name##_map_element; \
+		\
+		return result; \
+	} \
+	\
+	AVRO_NEW(tp##_map_##name)
+
+
+#define AVRO_RECORD_START(tp, name) \
+	static int \
+	tp##_##name##_record_field(avro_consumer_t *consumer, \
+				   unsigned int index, \
+				   avro_consumer_t **field_consumer, \
+				   void **field_user_data, \
+				   void *user_data) \
+	{ \
+		if (consumer->child_consumers[index]) { \
+			*field_consumer = consumer->child_consumers[index]; \
+			size_t  field_offset = (size_t) \
+			    consumer->child_user_data[index]; \
+			*field_user_data = user_data + field_offset; \
+		} \
+		return 0; \
+	} \
+	\
+	\
+	AVRO_MEMOIZE_KEY(tp##_##name); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		if (!is_avro_record(wschema)) { \
+			avro_set_error("Cannot store %s into record", \
+				       avro_schema_type_name(wschema)); \
+			return NULL; \
+		} \
+		\
+		const char  *wname = avro_schema_name(wschema); \
+		if (strcmp(wname, #name) != 0) { \
+			avro_set_error("Record names don't match"); \
+			return NULL; \
+		} \
+		\
+		avro_consumer_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		\
+		result = avro_new(avro_consumer_t); \
+		memset(result, 0, sizeof(avro_consumer_t)); \
+		result->schema = avro_schema_incref(wschema); \
+		AVRO_SET_MEMOIZE(tp##_##name); \
+		result->callbacks.record_field = \
+		    tp##_##name##_record_field; \
+		\
+		size_t  wfields = avro_schema_record_size(wschema); \
+		avro_consumer_allocate_children(result, wfields); \
+
+#define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
+		{ \
+			int  widx = avro_schema_record_field_get_index \
+			    (wschema, #field); \
+			if (widx == -1) { \
+				avro_set_error \
+				("Reader field " #field " doesn't " \
+				 "appear in writer schema"); \
+				goto error; \
+			} \
+			\
+			avro_schema_t  wfield = \
+			    avro_schema_record_field_get_by_index(wschema, widx); \
+			avro_consumer_t  *field_consumer = \
+			    AVRO_CONSUMER(tp, ftype, fref)(wfield); \
+			if (!field_consumer) { \
+				avro_prefix_error \
+				("Field " #field " isn't compatible: "); \
+				goto error; \
+			} \
+			result->child_consumers[widx] = field_consumer; \
+			result->child_user_data[widx] = (void *) \
+			    (offsetof(tp##_##name##_t, field)); \
+		}
+
+#define AVRO_RECORD_END(tp, name) \
+		return result; \
+		\
+	error: \
+		AVRO_DELETE_MEMOIZE(tp##_##name); \
+		avro_consumer_free(result); \
+		return NULL; \
+	} \
+	\
+	AVRO_NEW(tp##_##name)
+
+
+#define AVRO_UNION_START(tp, name) \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		(void) mem; \
+		(void) wschema; \
+		return NULL; \
+	} \
+	\
+	AVRO_NEW(tp##_##name)
+
+
+#define AVRO_FORWARD(tp, type, name)                                  /* nothing */
+#define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
+#define AVRO_ENUM_END(tp, name)                                       /* nothing */
+#define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last)  /* nothing */
+#define AVRO_UNION_END(tp, name)                                      /* nothing */
+
+
+/* Call SCHEMA_DEFINITION to generate the code */
+
+SCHEMA_DEFINITION()
+
+
+/* Undefine everything when we're done */
+
+#undef AVRO_CONSUMER
+#undef AVRO_CONSUMER_boolean
+#undef AVRO_CONSUMER_bytes
+#undef AVRO_CONSUMER_float
+#undef AVRO_CONSUMER_double
+#undef AVRO_CONSUMER_int
+#undef AVRO_CONSUMER_long
+#undef AVRO_CONSUMER_null
+#undef AVRO_CONSUMER_string
+#undef AVRO_CONSUMER_array
+#undef AVRO_CONSUMER_enum
+#undef AVRO_CONSUMER_fixed
+#undef AVRO_CONSUMER_map
+#undef AVRO_CONSUMER_record
+#undef AVRO_CONSUMER_recursive
+#undef AVRO_CONSUMER_union
+
+#undef AVRO_NEW
+#undef AVRO_MEMOIZE_KEY
+#undef AVRO_CHECK_MEMOIZE
+#undef AVRO_SET_MEMOIZE
+
+#undef AVRO_FORWARD
+#undef AVRO_ARRAY
+#undef AVRO_ENUM_START
+#undef AVRO_ENUM_SYMBOL
+#undef AVRO_ENUM_END
+#undef AVRO_FIXED
+#undef AVRO_MAP
+#undef AVRO_RECORD_START
+#undef AVRO_RECORD_FIELD
+#undef AVRO_RECORD_END
+#undef AVRO_UNION_START
+#undef AVRO_UNION_BRANCH
+#undef AVRO_UNION_END

@@ -55,6 +55,10 @@ avro_consumer_free_cycles(avro_consumer_t *consumer, st_table *freeing)
 		avro_free(consumer->child_consumers,
 			  sizeof(avro_consumer_t *) * consumer->num_children);
 	}
+	if (consumer->child_user_data) {
+		avro_free(consumer->child_user_data,
+			  sizeof(void *) * consumer->num_children);
+	}
 
 	if (consumer->callbacks.free) {
 		consumer->callbacks.free(consumer);
@@ -78,4 +82,6 @@ avro_consumer_allocate_children(avro_consumer_t *consumer,
 	consumer->num_children = num_children;
 	consumer->child_consumers =
 	    avro_calloc(num_children, sizeof(avro_consumer_t *));
+	consumer->child_user_data =
+	    avro_calloc(num_children, sizeof(void *));
 }

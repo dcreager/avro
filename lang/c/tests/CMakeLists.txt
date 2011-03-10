@@ -60,6 +60,8 @@ add_custom_command(
         ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
     DEPENDS
       ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
+      ${CMAKE_CURRENT_SOURCE_DIR}/../src/avrocc.c
+      ${CMAKE_CURRENT_SOURCE_DIR}/../src/schema_specific.c
 )
 
 add_executable(test_specific

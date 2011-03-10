@@ -34,10 +34,12 @@ set(AVRO_SRC
     avro/specific/done.c.in
     avro/specific/init.c.in
     avro/specific/map.c.in
+    avro/specific/resolver.c.in
     avro/specific/union_set.c.in
     avro/specific/accessors.h.in
     avro/specific/comparison.h.in
     avro/specific/lifecycle.h.in
+    avro/specific/resolver.h.in
     avro/specific/typedef.h.in
     avro_private.h
     consumer.c

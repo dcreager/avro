@@ -137,7 +137,7 @@
 	{ \
 		(void) obj;
 
-#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last) \
+#define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
 		AVRO_TYPE_DONE(tp, ftype, fref, field);
 
 #define AVRO_RECORD_END(tp, name) \

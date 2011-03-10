@@ -99,7 +99,7 @@
  *   described above.
  *
  * AVRO_RECORD_START(type_prefix, record_name)
- * AVRO_RECORD_FIELD(type_prefix, record_name, field_name,
+ * AVRO_RECORD_FIELD(type_prefix, record_name, index, field_name,
  *                   field_type, field_reference, first, last)
  * AVRO_RECORD_END(type_prefix, record_name)
  *
@@ -144,3 +144,4 @@
 #include <avro/specific/lifecycle.h.in>
 #include <avro/specific/accessors.h.in>
 #include <avro/specific/comparison.h.in>
+#include <avro/specific/resolver.h.in>

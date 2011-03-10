@@ -202,7 +202,7 @@
 			return 0; \
 		}
 
-#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last) \
+#define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
 		if (!AVRO_EQUALS \
 		     (tp, ftype, fref, &obj1->field, &obj2->field)) { \
 			return 0; \

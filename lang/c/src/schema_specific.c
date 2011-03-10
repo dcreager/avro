@@ -462,9 +462,9 @@ avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
 					    (schema, i);
 
 					check(rval, write(ctx->writer,
-					      "  AVRO_RECORD_FIELD(%s, %s, %s, ",
+					      "  AVRO_RECORD_FIELD(%s, %s, %u, %s, ",
 					      ctx->type_prefix, record_name,
-					      field_name));
+					      i, field_name));
 					check(rval, avro_schema_type_ref(ctx, field));
 					check(rval, write(ctx->writer,
 					      ", %u, %u) \\\n",

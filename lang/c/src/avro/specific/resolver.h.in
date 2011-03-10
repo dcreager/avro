@@ -15,31 +15,64 @@
  * permissions and limitations under the License.
  */
 
-#include <stdint.h>
-
+#include <avro.h>
+#include <avro/consumer.h>
 #include <avro/data.h>
 
 /*
- * This file creates function prototypes for various comparison
- * operations for schema-specific types.
+ * This file creates prototypes for the functions that create a resolver
+ * for a schema type.
  */
-
-
-/* Define some helper macros */
-
-#define AVRO_COMPARISON(basename) \
-	int basename##_equals(const basename##_t *val1, \
-			      const basename##_t *val2);
-
 
 /* Define the macros that can be used in SCHEMA_DEFINITION */
 
-#define AVRO_ARRAY(tp, name, itype, iref)   AVRO_COMPARISON(tp##_array_##name)
-#define AVRO_ENUM_START(tp, name)           AVRO_COMPARISON(tp##_##name)
-#define AVRO_FIXED(tp, name, size)          AVRO_COMPARISON(tp##_##name)
-#define AVRO_MAP(tp, name, itype, iref)     AVRO_COMPARISON(tp##_map_##name)
-#define AVRO_RECORD_START(tp, name)         AVRO_COMPARISON(tp##_##name)
-#define AVRO_UNION_START(tp, name)          AVRO_COMPARISON(tp##_##name)
+#define AVRO_ARRAY(tp, name, itype, iref) \
+	avro_consumer_t * \
+	tp##_array_##name##_resolver_memoized(avro_memoize_t *mem, \
+					      avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_array_##name##_resolver_new(avro_schema_t writer_schema);
+
+#define AVRO_ENUM_START(tp, name) \
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_new(avro_schema_t writer_schema);
+
+#define AVRO_FIXED(tp, name, size) \
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_new(avro_schema_t writer_schema);
+
+#define AVRO_MAP(tp, name, itype, iref) \
+	avro_consumer_t * \
+	tp##_map_##name##_resolver_memoized(avro_memoize_t *mem, \
+					    avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_map_##name##_resolver_new(avro_schema_t writer_schema);
+
+#define AVRO_RECORD_START(tp, name) \
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_new(avro_schema_t writer_schema);
+
+#define AVRO_UNION_START(tp, name) \
+	avro_consumer_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t writer_schema); \
+	\
+	avro_consumer_t * \
+	tp##_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_FORWARD(tp, type, name)                                  /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
@@ -56,8 +89,6 @@ SCHEMA_DEFINITION()
 
 
 /* Undefine everything when we're done */
-
-#undef AVRO_COMPARISON
 
 #undef AVRO_FORWARD
 #undef AVRO_ARRAY

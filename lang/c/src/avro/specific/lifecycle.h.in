@@ -46,7 +46,7 @@
 #define AVRO_ENUM_START(tp, name)                                     /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
 #define AVRO_ENUM_END(tp, name)                                       /* nothing */
-#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last)  /* nothing */
+#define AVRO_RECORD_FIELD(tp, name, i, field, ftype, fref, first, last)  /* nothing */
 #define AVRO_RECORD_END(tp, name)                                     /* nothing */
 #define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last)  /* nothing */
 #define AVRO_UNION_END(tp, name)                                      /* nothing */

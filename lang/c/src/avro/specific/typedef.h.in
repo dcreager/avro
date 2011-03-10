@@ -122,7 +122,7 @@
 #define AVRO_RECORD_START(tp, name) \
 	struct tp##_##name {
 
-#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last) \
+#define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
 		AVRO_TYPE_REF(tp, ftype, fref)  field;
 
 #define AVRO_RECORD_END(tp, name) \

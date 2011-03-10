@@ -326,12 +326,22 @@ test_array(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_t  schema = avro_schema_array(avro_schema_double());
+	avro_datum_t  datum = avro_array(schema);
+	avro_datum_t  delement = avro_double(42.0);
+	avro_array_append_datum(datum, delement);
+	avro_datum_decref(delement);
+
+	write_read_test(datum, array, array2, specific_array_double);
+
 	specific_array_double_clear(&array);
 	if (specific_array_double_size(&array) != 0) {
 		fprintf(stderr, "Array should be empty after clearing.\n");
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_decref(schema);
+	avro_datum_decref(datum);
 	specific_array_double_done(&array);
 	specific_array_double_done(&array2);
 	return EXIT_SUCCESS;
@@ -348,6 +358,15 @@ test_enum(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_t  schema = avro_schema_enum("scheme");
+	avro_schema_enum_symbol_append(schema, "POLAR");
+	avro_schema_enum_symbol_append(schema, "RECTANGULAR");
+	avro_datum_t  datum = avro_enum(schema, 1);
+
+	write_read_test(datum, value1, value2, specific_scheme);
+
+	avro_schema_decref(schema);
+	avro_datum_decref(datum);
 	return EXIT_SUCCESS;
 }
 
@@ -362,6 +381,13 @@ test_fixed(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_t  schema = avro_schema_fixed("ipv4", 4);
+	avro_datum_t  datum = avro_fixed(schema, "\xde\xad\xbe\xef", 4);
+
+	write_read_test(datum, value1, value2, specific_ipv4);
+
+	avro_schema_decref(schema);
+	avro_datum_decref(datum);
 	return EXIT_SUCCESS;
 }
 
@@ -429,15 +455,59 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_t  schema = avro_schema_map(avro_schema_string());
+	avro_datum_t  datum = avro_map(schema);
+	avro_datum_t  delement = avro_string("value");
+	avro_map_set(datum, "a", delement);
+	avro_datum_decref(delement);
+
+	write_read_test(datum, map, map2, specific_map_string);
+
 	specific_map_string_clear(&map);
 	if (specific_map_string_size(&map) != 0) {
 		fprintf(stderr, "map should be empty after clearing.\n");
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_decref(schema);
+	avro_datum_decref(datum);
 	specific_map_string_done(&map);
 	specific_map_string_done(&map2);
 	return EXIT_SUCCESS;
+}
+
+static int
+test_record(void)
+{
+	specific_point_t  point1;
+	specific_point_init(&point1);
+        point1.x = 5;
+        point1.y = 2;
+
+	specific_point_t  point2;
+	specific_point_init(&point2);
+        point2.x = 5;
+        point2.y = 2;
+
+	if (!specific_point_equals(&point1, &point2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
+	avro_schema_t  schema = avro_schema_record("point", NULL);
+	avro_schema_record_field_append(schema, "x", avro_schema_int());
+	avro_schema_record_field_append(schema, "y", avro_schema_int());
+	avro_datum_t  datum = avro_record(schema);
+	avro_record_set(datum, "x", avro_int32(5));
+	avro_record_set(datum, "y", avro_int32(2));
+
+	write_read_test(datum, point1, point2, specific_point);
+
+	avro_schema_decref(schema);
+	avro_datum_decref(datum);
+	specific_point_done(&point1);
+	specific_point_done(&point2);
+        return EXIT_SUCCESS;
 }
 
 static int
@@ -495,6 +565,7 @@ int main(void)
 		{ "enum", test_enum },
 		{ "fixed", test_fixed },
 		{ "map", test_map },
+		{ "record", test_record },
 		{ "nested", test_nested }
 	};
 

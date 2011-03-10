@@ -120,7 +120,7 @@
 	void tp##_##name##_init(tp##_##name##_t *obj) \
 	{
 
-#define AVRO_RECORD_FIELD(tp, name, field, ftype, fref, first, last) \
+#define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
 		AVRO_TYPE_INIT(tp, ftype, fref, field);
 
 #define AVRO_RECORD_END(tp, name) \
