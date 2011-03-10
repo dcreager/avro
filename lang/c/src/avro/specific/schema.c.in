@@ -1,0 +1,250 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+#include <stdint.h>
+
+#include <avro.h>
+#include <avro/data.h>
+#include <avro/specific.h>
+
+/*
+ * This file creates prototypes for the functions that manipulate array,
+ * map, and union values.
+ */
+
+
+/* Define some helper macros */
+
+#define AVRO_SCHEMA(tp, type, ref)  AVRO_SCHEMA_##type(tp, ref)
+
+#define AVRO_SCHEMA_boolean(tp, ref)         avro_schema_boolean()
+#define AVRO_SCHEMA_bytes(tp, ref)           avro_schema_bytes()
+#define AVRO_SCHEMA_float(tp, ref)           avro_schema_float()
+#define AVRO_SCHEMA_double(tp, ref)          avro_schema_double()
+#define AVRO_SCHEMA_int(tp, ref)             avro_schema_int()
+#define AVRO_SCHEMA_long(tp, ref)            avro_schema_long()
+#define AVRO_SCHEMA_null(tp, ref)            avro_schema_null()
+#define AVRO_SCHEMA_string(tp, ref)          avro_schema_string()
+
+#define AVRO_SCHEMA_array(tp, ref)      tp##_array_##ref##_schema()
+#define AVRO_SCHEMA_enum(tp, ref)       tp##_##ref##_schema()
+#define AVRO_SCHEMA_fixed(tp, ref)      tp##_##ref##_schema()
+#define AVRO_SCHEMA_map(tp, ref)        tp##_map_##ref##_schema()
+#define AVRO_SCHEMA_record(tp, ref)     tp##_##ref##_schema()
+#define AVRO_SCHEMA_recursive(tp, ref)  tp##_##ref##_schema()
+#define AVRO_SCHEMA_union(tp, ref)      tp##_##ref##_schema()
+
+
+/* Define the macros that can be used in SCHEMA_DEFINITION */
+
+#define AVRO_ARRAY(tp, name, itype, iref) \
+	static avro_schema_t  _##tp##_array_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_array_##name##_schema(void) \
+	{ \
+		if (_##tp##_array_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_array_##name##_schema); \
+		} \
+		avro_schema_t  items = AVRO_SCHEMA(tp, itype, iref); \
+		if (items) { \
+			avro_schema_t  array = avro_schema_array(items); \
+			avro_schema_decref(items); \
+			_##tp##_array_##name##_schema = array; \
+			return avro_schema_incref(array); \
+		} \
+		return NULL; \
+	}
+
+
+#define AVRO_ENUM_START(tp, name) \
+	static avro_schema_t  _##tp##_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_##name##_schema(void) \
+	{ \
+		if (_##tp##_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_##name##_schema); \
+		} \
+		avro_schema_t  result = avro_schema_enum(#name); \
+		int  rc;
+
+#define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last) \
+		rc = avro_schema_enum_symbol_append(result, "symbol"); \
+		if (rc) { \
+			avro_schema_decref(result); \
+			return NULL; \
+		}
+
+#define AVRO_ENUM_END(tp, name) \
+		_##tp##_##name##_schema = result; \
+		return avro_schema_incref(result); \
+	}
+
+#define AVRO_FIXED(tp, name, size) \
+	static avro_schema_t  _##tp##_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_##name##_schema(void) \
+	{ \
+		if (_##tp##_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_##name##_schema); \
+		} \
+		\
+		avro_schema_t  result = avro_schema_fixed(#name, size); \
+		_##tp##_##name##_schema = result; \
+		return avro_schema_incref(result); \
+	}
+
+
+#define AVRO_MAP(tp, name, itype, iref) \
+	static avro_schema_t  _##tp##_map_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_map_##name##_schema(void) \
+	{ \
+		if (_##tp##_map_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_map_##name##_schema); \
+		} \
+		avro_schema_t  values = AVRO_SCHEMA(tp, itype, iref); \
+		if (values) { \
+			avro_schema_t  map = avro_schema_map(values); \
+			avro_schema_decref(values); \
+			_##tp##_map_##name##_schema = map; \
+			return avro_schema_incref(map); \
+		} \
+		return NULL; \
+	}
+
+
+#define AVRO_RECORD_START(tp, name) \
+	static avro_schema_t  _##tp##_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_##name##_schema(void) \
+	{ \
+		if (_##tp##_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_##name##_schema); \
+		} \
+		avro_schema_t  result = avro_schema_record(#name, NULL); \
+		_##tp##_##name##_schema = result; \
+		int  rc;
+
+#define AVRO_RECORD_FIELD(tp, name, i, field, ftype, fref, first, last) \
+		{ \
+			avro_schema_t  fld = AVRO_SCHEMA(tp, ftype, fref); \
+			if (!fld) { \
+				avro_schema_decref(result); \
+				_##tp##_##name##_schema = NULL; \
+				return NULL; \
+			} \
+			rc = avro_schema_record_field_append \
+			    (result, #field, fld); \
+			if (rc) { \
+				avro_schema_decref(fld); \
+				avro_schema_decref(result); \
+				_##tp##_##name##_schema = NULL; \
+				return NULL; \
+			} \
+		}
+
+#define AVRO_RECORD_END(tp, name) \
+		return avro_schema_incref(result); \
+	}
+
+
+#define AVRO_UNION_START(tp, name) \
+	static avro_schema_t  _##tp##_##name##_schema = NULL; \
+	\
+	avro_schema_t \
+	tp##_##name##_schema(void) \
+	{ \
+		if (_##tp##_##name##_schema) { \
+			return avro_schema_incref \
+			    (_##tp##_##name##_schema); \
+		} \
+		avro_schema_t  result = avro_schema_record(#name, NULL); \
+		_##tp##_##name##_schema = result; \
+		int  rc;
+
+#define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last) \
+		{ \
+			avro_schema_t  branch = AVRO_SCHEMA(tp, btype, bref); \
+			if (!branch) { \
+				avro_schema_decref(result); \
+				_##tp##_##name##_schema = NULL; \
+				return NULL; \
+			} \
+			rc = avro_schema_union_append(result, branch); \
+			if (rc) { \
+				avro_schema_decref(branch); \
+				avro_schema_decref(result); \
+				_##tp##_##name##_schema = NULL; \
+				return NULL; \
+			} \
+		}
+
+#define AVRO_UNION_END(tp, name) \
+		return avro_schema_incref(result); \
+	}
+
+
+#define AVRO_FORWARD(tp, type, name)                                  /* nothing */
+
+
+/* Call SCHEMA_DEFINITION to generate the code */
+
+SCHEMA_DEFINITION()
+
+
+/* Undefine everything when we're done */
+
+#undef AVRO_SCHEMA
+#undef AVRO_SCHEMA_boolean
+#undef AVRO_SCHEMA_bytes
+#undef AVRO_SCHEMA_float
+#undef AVRO_SCHEMA_double
+#undef AVRO_SCHEMA_int
+#undef AVRO_SCHEMA_long
+#undef AVRO_SCHEMA_null
+#undef AVRO_SCHEMA_string
+#undef AVRO_SCHEMA_array
+#undef AVRO_SCHEMA_enum
+#undef AVRO_SCHEMA_fixed
+#undef AVRO_SCHEMA_map
+#undef AVRO_SCHEMA_record
+#undef AVRO_SCHEMA_recursive
+#undef AVRO_SCHEMA_union
+
+#undef AVRO_FORWARD
+#undef AVRO_ARRAY
+#undef AVRO_ENUM_START
+#undef AVRO_ENUM_SYMBOL
+#undef AVRO_ENUM_END
+#undef AVRO_FIXED
+#undef AVRO_MAP
+#undef AVRO_RECORD_START
+#undef AVRO_RECORD_FIELD
+#undef AVRO_RECORD_END
+#undef AVRO_UNION_START
+#undef AVRO_UNION_BRANCH
+#undef AVRO_UNION_END

@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include <avro.h>
 #include <avro/data.h>
 #include <avro/specific.h>
 
@@ -86,7 +87,20 @@
 	tp##_array_##name##_get(const tp##_array_##name##_t *obj, size_t index); \
 	\
 	AVRO_TYPE_REF(tp, itype, iref) * \
-	tp##_array_##name##_append(tp##_array_##name##_t *obj);
+	tp##_array_##name##_append(tp##_array_##name##_t *obj); \
+	\
+	avro_schema_t \
+	tp##_array_##name##_schema(void);
+
+
+#define AVRO_ENUM_START(tp, name) \
+	avro_schema_t \
+	tp##_##name##_schema(void);
+
+
+#define AVRO_FIXED(tp, name, size) \
+	avro_schema_t \
+	tp##_##name##_schema(void);
 
 
 #define AVRO_MAP(tp, name, itype, iref) \
@@ -108,21 +122,30 @@
 	int \
 	tp##_map_##name##_get_or_create(tp##_map_##name##_t *obj, const char *key, \
 					AVRO_TYPE_REF(tp, itype, iref) **element, \
-					unsigned int *index);
+					unsigned int *index); \
+	\
+	avro_schema_t \
+	tp##_map_##name##_schema(void);
+
+
+#define AVRO_RECORD_START(tp, name) \
+	avro_schema_t \
+	tp##_##name##_schema(void);
 
 
 #define AVRO_UNION_START(tp, name) \
-	void tp##_##name##_clear(tp##_##name##_t *obj);
+	void tp##_##name##_clear(tp##_##name##_t *obj); \
+	\
+	avro_schema_t \
+	tp##_##name##_schema(void);
 
 #define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last) \
 	AVRO_UNION_SET(tp, name, AVRO_TYPE_NAME(btype, bref))
 
+
 #define AVRO_FORWARD(tp, type, name)                                  /* nothing */
-#define AVRO_ENUM_START(tp, name)                                     /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
 #define AVRO_ENUM_END(tp, name)                                       /* nothing */
-#define AVRO_FIXED(tp, name, size)                                    /* nothing */
-#define AVRO_RECORD_START(tp, name)                                   /* nothing */
 #define AVRO_RECORD_FIELD(tp, name, i, field, ftype, fref, first, last)  /* nothing */
 #define AVRO_RECORD_END(tp, name)                                     /* nothing */
 #define AVRO_UNION_END(tp, name)                                      /* nothing */

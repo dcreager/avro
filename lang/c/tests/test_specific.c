@@ -326,7 +326,7 @@ test_array(void)
 		return EXIT_FAILURE;
 	}
 
-	avro_schema_t  schema = avro_schema_array(avro_schema_double());
+	avro_schema_t  schema = specific_array_double_schema();
 	avro_datum_t  datum = avro_array(schema);
 	avro_datum_t  delement = avro_double(42.0);
 	avro_array_append_datum(datum, delement);
@@ -358,9 +358,7 @@ test_enum(void)
 		return EXIT_FAILURE;
 	}
 
-	avro_schema_t  schema = avro_schema_enum("scheme");
-	avro_schema_enum_symbol_append(schema, "POLAR");
-	avro_schema_enum_symbol_append(schema, "RECTANGULAR");
+	avro_schema_t  schema = specific_scheme_schema();
 	avro_datum_t  datum = avro_enum(schema, 1);
 
 	write_read_test(datum, value1, value2, specific_scheme);
@@ -381,7 +379,7 @@ test_fixed(void)
 		return EXIT_FAILURE;
 	}
 
-	avro_schema_t  schema = avro_schema_fixed("ipv4", 4);
+	avro_schema_t  schema = specific_ipv4_schema();
 	avro_datum_t  datum = avro_fixed(schema, "\xde\xad\xbe\xef", 4);
 
 	write_read_test(datum, value1, value2, specific_ipv4);
@@ -455,7 +453,7 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
-	avro_schema_t  schema = avro_schema_map(avro_schema_string());
+	avro_schema_t  schema = specific_map_string_schema();
 	avro_datum_t  datum = avro_map(schema);
 	avro_datum_t  delement = avro_string("value");
 	avro_map_set(datum, "a", delement);
@@ -494,9 +492,7 @@ test_record(void)
 		return EXIT_FAILURE;
 	}
 
-	avro_schema_t  schema = avro_schema_record("point", NULL);
-	avro_schema_record_field_append(schema, "x", avro_schema_int());
-	avro_schema_record_field_append(schema, "y", avro_schema_int());
+	avro_schema_t  schema = specific_point_schema();
 	avro_datum_t  datum = avro_record(schema);
 	avro_record_set(datum, "x", avro_int32(5));
 	avro_record_set(datum, "y", avro_int32(2));

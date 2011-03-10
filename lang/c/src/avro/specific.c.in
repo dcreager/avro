@@ -47,6 +47,7 @@
 #include <avro/specific/done.c.in>
 #include <avro/specific/array.c.in>
 #include <avro/specific/map.c.in>
+#include <avro/specific/schema.c.in>
 #include <avro/specific/union_set.c.in>
 #include <avro/specific/comparison.c.in>
 #include <avro/specific/resolver.c.in>
