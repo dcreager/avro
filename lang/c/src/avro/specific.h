@@ -85,6 +85,31 @@ avro_raw_string_equals(const avro_raw_string_t *val1,
 
 
 /*---------------------------------------------------------------------
+ * Schema-specific resolvers
+ *
+ * We'll need a couple of additional fields in the schema-specific
+ * resolver classes, so that we can handle reader unions.
+ */
+
+typedef void *
+(*avro_specific_branch_selector_t)(void *unionp);
+
+typedef struct avro_specific_resolver
+{
+	avro_consumer_t  parent;
+
+	/*
+	 * If the reader schema is a union, this function should be used
+	 * to select the appropriate branch for this resolver's writer
+	 * schema.
+	 */
+
+	avro_specific_branch_selector_t  branch_selector;
+
+} avro_specific_resolver_t;
+
+
+/*---------------------------------------------------------------------
  * “Raw” resolvers
  *
  * These functions produce consumer instances that can read data into

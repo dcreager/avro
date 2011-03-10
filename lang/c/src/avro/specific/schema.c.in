@@ -182,7 +182,7 @@
 			return avro_schema_incref \
 			    (_##tp##_##name##_schema); \
 		} \
-		avro_schema_t  result = avro_schema_record(#name, NULL); \
+		avro_schema_t  result = avro_schema_union(); \
 		_##tp##_##name##_schema = result; \
 		int  rc;
 

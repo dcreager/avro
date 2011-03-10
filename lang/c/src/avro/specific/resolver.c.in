@@ -32,24 +32,64 @@
 
 /* Define some helper macros */
 
-#define AVRO_CONSUMER(tp, type, ref)  AVRO_CONSUMER_##type(tp, ref)
+#define AVRO_TYPE_NAME(type, ref)  AVRO_TYPE_NAME_##type(ref)
 
-#define AVRO_CONSUMER_boolean(tp, ref)      avro_raw_boolean_resolver_new
-#define AVRO_CONSUMER_bytes(tp, ref)        avro_raw_bytes_resolver_new
-#define AVRO_CONSUMER_float(tp, ref)        avro_raw_float_resolver_new
-#define AVRO_CONSUMER_double(tp, ref)       avro_raw_double_resolver_new
-#define AVRO_CONSUMER_int(tp, ref)          avro_raw_int_resolver_new
-#define AVRO_CONSUMER_long(tp, ref)         avro_raw_long_resolver_new
-#define AVRO_CONSUMER_null(tp, ref)         avro_raw_null_resolver_new
-#define AVRO_CONSUMER_string(tp, ref)       avro_raw_string_resolver_new
+#define AVRO_TYPE_NAME_boolean(ref)         boolean
+#define AVRO_TYPE_NAME_bytes(ref)           bytes
+#define AVRO_TYPE_NAME_float(ref)           float
+#define AVRO_TYPE_NAME_double(ref)          double
+#define AVRO_TYPE_NAME_int(ref)             int
+#define AVRO_TYPE_NAME_long(ref)            long
+#define AVRO_TYPE_NAME_null(ref)            null
+#define AVRO_TYPE_NAME_string(ref)          string
 
-#define AVRO_CONSUMER_array(tp, ref)        tp##_array_##ref##_resolver_new
-#define AVRO_CONSUMER_enum(tp, ref)         tp##_##ref##_resolver_new
-#define AVRO_CONSUMER_fixed(tp, ref)        tp##_##ref##_resolver_new
-#define AVRO_CONSUMER_map(tp, ref)          tp##_map_##ref##_resolver_new
-#define AVRO_CONSUMER_record(tp, ref)       tp##_##ref##_resolver_new
-#define AVRO_CONSUMER_recursive(tp, ref)    tp##_##ref##_resolver_new
-#define AVRO_CONSUMER_union(tp, ref)        tp##_##ref##_resolver_new
+#define AVRO_TYPE_NAME_array(ref)           array##_##ref
+#define AVRO_TYPE_NAME_enum(ref)            ref
+#define AVRO_TYPE_NAME_fixed(ref)           ref
+#define AVRO_TYPE_NAME_map(ref)             map##_##ref
+#define AVRO_TYPE_NAME_record(ref)          ref
+#define AVRO_TYPE_NAME_recursive(ref)       ref
+#define AVRO_TYPE_NAME_union(ref)           ref
+
+
+#define AVRO_CONSUMER(tp, type, ref, ws)  AVRO_CONSUMER_##type(tp, ref, ws)
+
+#define AVRO_CONSUMER_boolean(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_boolean_resolver_new(wschema)
+#define AVRO_CONSUMER_bytes(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_bytes_resolver_new(wschema)
+#define AVRO_CONSUMER_float(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_float_resolver_new(wschema)
+#define AVRO_CONSUMER_double(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_double_resolver_new(wschema)
+#define AVRO_CONSUMER_int(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_int_resolver_new(wschema)
+#define AVRO_CONSUMER_long(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_long_resolver_new(wschema)
+#define AVRO_CONSUMER_null(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_null_resolver_new(wschema)
+#define AVRO_CONSUMER_string(tp, ref, wschema) \
+	(avro_specific_resolver_t *) avro_raw_string_resolver_new(wschema)
+
+#define AVRO_CONSUMER_array(tp, ref, wschema) \
+        tp##_array_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_enum(tp, ref, wschema) \
+         tp##_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_fixed(tp, ref, wschema) \
+        tp##_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_map(tp, ref, wschema) \
+          tp##_map_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_record(tp, ref, wschema) \
+       tp##_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_recursive(tp, ref, wschema) \
+    tp##_##ref##_resolver_memoized(mem, wschema)
+#define AVRO_CONSUMER_union(tp, ref, wschema) \
+        tp##_##ref##_resolver_memoized(mem, wschema)
+
+
+#define AVRO_UNION_SET_NAME_(tp, name, bname)  tp##_##name##_set_##bname
+#define AVRO_UNION_SET_NAME(tp, name, bname) \
+	AVRO_UNION_SET_NAME_(tp, name, bname)
 
 
 #define AVRO_NEW(name) \
@@ -58,9 +98,10 @@
 	{ \
 		avro_memoize_t  mem; \
 		avro_memoize_init(&mem); \
-		avro_consumer_t  *result = name##_resolver_memoized(&mem, wschema); \
+		avro_specific_resolver_t  *result = \
+		    name##_resolver_memoized(&mem, wschema); \
 		avro_memoize_done(&mem); \
-		return result; \
+		return &result->parent; \
 	}
 
 #define AVRO_MEMOIZE_KEY(name) \
@@ -78,6 +119,21 @@
 #define AVRO_DELETE_MEMOIZE(name) \
 	avro_memoize_delete(mem, &name##_memoize_key, wschema);
 
+#define AVRO_TRY_NONUNION(name) \
+	{ \
+		result = name##_resolver_try(mem, wschema); \
+		return result; \
+	}
+
+
+static void
+avro_raw_resolver_free(avro_consumer_t *consumer)
+{
+	avro_specific_resolver_t  *resolver =
+	    (avro_specific_resolver_t *) consumer;
+	avro_freet(avro_specific_resolver_t, resolver);
+}
+
 
 /* Define the macros that can be used in SCHEMA_DEFINITION */
 
@@ -88,7 +144,12 @@
 					unsigned int block_count, \
 					void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		avro_raw_array_t *array = user_data; \
 		if (is_first_block) { \
 			avro_raw_array_clear(array); \
@@ -104,7 +165,12 @@
 					  void **element_user_data, \
 					  void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		(void) index; \
 		tp##_array_##name##_t  *obj = user_data; \
 		avro_raw_array_t *array = &obj->array; \
@@ -118,9 +184,9 @@
 	\
 	AVRO_MEMOIZE_KEY(tp##_array_##name); \
 	\
-	avro_consumer_t * \
-	tp##_array_##name##_resolver_memoized(avro_memoize_t *mem, \
-					    avro_schema_t wschema) \
+	static avro_specific_resolver_t * \
+	tp##_array_##name##_resolver_try(avro_memoize_t *mem, \
+					 avro_schema_t wschema) \
 	{ \
 		if (!is_avro_array(wschema)) { \
 			avro_set_error("Cannot store %s into array", \
@@ -128,32 +194,41 @@
 			return NULL; \
 		} \
 		\
-		avro_consumer_t  *result = NULL; \
-		AVRO_CHECK_MEMOIZE(tp##_array_##name); \
-		\
-		result = avro_new(avro_consumer_t); \
-		memset(result, 0, sizeof(avro_consumer_t)); \
-		result->schema = avro_schema_incref(wschema); \
+		avro_specific_resolver_t  *result = \
+		    avro_new(avro_specific_resolver_t); \
+		memset(result, 0, sizeof(avro_specific_resolver_t)); \
+		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_array_##name); \
 		\
 		avro_schema_t  witems = avro_schema_array_items(wschema); \
-		avro_consumer_t  *item_consumer = \
-		    AVRO_CONSUMER(tp, itype, iref)(witems); \
+		avro_specific_resolver_t  *item_consumer = \
+		    AVRO_CONSUMER(tp, itype, iref, witems); \
 		if (!item_consumer) { \
 			AVRO_DELETE_MEMOIZE(tp##_array_##name); \
-			avro_consumer_free(result); \
+			avro_consumer_free(&result->parent); \
 			avro_prefix_error("Array items aren't compatible: "); \
 			return NULL; \
 		} \
 		\
-		avro_consumer_allocate_children(result, 1); \
-		result->child_consumers[0] = item_consumer; \
-		result->callbacks.array_start_block = \
+		avro_consumer_allocate_children(&result->parent, 1); \
+		result->parent.child_consumers[0] = &item_consumer->parent; \
+		result->parent.callbacks.array_start_block = \
 		    tp##_array_##name##_start_block; \
-		result->callbacks.array_element = \
+		result->parent.callbacks.array_element = \
 		    tp##_array_##name##_array_element; \
 		\
 		return result; \
+	} \
+	\
+	avro_specific_resolver_t * \
+	tp##_array_##name##_resolver_memoized(avro_memoize_t *mem, \
+					      avro_schema_t wschema) \
+	{ \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_array_##name); \
+		AVRO_TRY_NONUNION(tp##_array_##name); \
+		return NULL; \
 	} \
 	\
 	AVRO_NEW(tp##_array_##name)
@@ -164,7 +239,12 @@
 	tp##_##name##_enum_value(avro_consumer_t *consumer, \
 				 int value, void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		tp##_##name##_t  *obj = user_data; \
 		*obj = value; \
 		return 0; \
@@ -172,9 +252,9 @@
 	\
 	AVRO_MEMOIZE_KEY(tp##_##name); \
 	\
-	avro_consumer_t * \
-	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
-					avro_schema_t wschema) \
+	static avro_specific_resolver_t * \
+	tp##_##name##_resolver_try(avro_memoize_t *mem, \
+				   avro_schema_t wschema) \
 	{ \
 		if (!is_avro_enum(wschema)) { \
 			avro_set_error("Cannot store %s into enum", \
@@ -188,17 +268,27 @@
 			return NULL; \
 		} \
 		\
-		avro_consumer_t  *result = NULL; \
-		AVRO_CHECK_MEMOIZE(tp##_##name); \
-		\
-		result = avro_new(avro_consumer_t); \
-		memset(result, 0, sizeof(avro_consumer_t)); \
-		result->schema = avro_schema_incref(wschema); \
+		avro_specific_resolver_t  *result = \
+		    avro_new(avro_specific_resolver_t); \
+		memset(result, 0, sizeof(avro_specific_resolver_t)); \
+		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
 		\
-		result->callbacks.enum_value = tp##_##name##_enum_value; \
+		result->parent.callbacks.enum_value = \
+		    tp##_##name##_enum_value; \
 		\
 		return result; \
+	} \
+	\
+	avro_specific_resolver_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		AVRO_TRY_NONUNION(tp##_##name); \
+		return NULL; \
 	} \
 	\
 	AVRO_NEW(tp##_##name)
@@ -210,7 +300,12 @@
 				  const void *value, size_t value_len, \
 				  void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		(void) value_len; \
 		tp##_##name##_t  *obj = user_data; \
 		memcpy(obj->contents, value, size); \
@@ -219,9 +314,9 @@
 	\
 	AVRO_MEMOIZE_KEY(tp##_##name); \
 	\
-	avro_consumer_t * \
-	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
-					avro_schema_t wschema) \
+	static avro_specific_resolver_t * \
+	tp##_##name##_resolver_try(avro_memoize_t *mem, \
+				   avro_schema_t wschema) \
 	{ \
 		if (!is_avro_fixed(wschema)) { \
 			avro_set_error("Cannot store %s into fixed", \
@@ -240,17 +335,26 @@
 			return NULL; \
 		} \
 		\
-		avro_consumer_t  *result = NULL; \
-		AVRO_CHECK_MEMOIZE(tp##_##name); \
-		\
-		result = avro_new(avro_consumer_t); \
-		memset(result, 0, sizeof(avro_consumer_t)); \
-		result->schema = avro_schema_incref(wschema); \
+		avro_specific_resolver_t  *result = \
+		    avro_new(avro_specific_resolver_t); \
+		memset(result, 0, sizeof(avro_specific_resolver_t)); \
+		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
 		\
-		result->callbacks.fixed_value = tp##_##name##_fixed_value; \
+		result->parent.callbacks.fixed_value = \
+		    tp##_##name##_fixed_value; \
 		\
 		return result; \
+	} \
+	\
+	avro_specific_resolver_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		AVRO_TRY_NONUNION(tp##_##name); \
 	} \
 	\
 	AVRO_NEW(tp##_##name)
@@ -263,7 +367,12 @@
 				      unsigned int block_count, \
 				      void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		avro_raw_map_t *map = user_data; \
 		if (is_first_block) { \
 			avro_raw_map_clear(map); \
@@ -280,7 +389,12 @@
 				      void **element_user_data, \
 				      void *user_data) \
 	{ \
-		(void) consumer; \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		(void) index; \
 		int rval; \
 		tp##_map_##name##_t  *obj = user_data; \
@@ -295,9 +409,9 @@
 	\
 	AVRO_MEMOIZE_KEY(tp##_map_##name); \
 	\
-	avro_consumer_t * \
-	tp##_map_##name##_resolver_memoized(avro_memoize_t *mem, \
-					    avro_schema_t wschema) \
+	static avro_specific_resolver_t * \
+	tp##_map_##name##_resolver_try(avro_memoize_t *mem, \
+				       avro_schema_t wschema) \
 	{ \
 		if (!is_avro_map(wschema)) { \
 			avro_set_error("Cannot store %s into map", \
@@ -305,32 +419,40 @@
 			return NULL; \
 		} \
 		\
-		avro_consumer_t  *result = NULL; \
-		AVRO_CHECK_MEMOIZE(tp##_map_##name); \
-		\
-		result = avro_new(avro_consumer_t); \
-		memset(result, 0, sizeof(avro_consumer_t)); \
-		result->schema = avro_schema_incref(wschema); \
+		avro_specific_resolver_t  *result = \
+		    avro_new(avro_specific_resolver_t); \
+		memset(result, 0, sizeof(avro_specific_resolver_t)); \
+		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_map_##name); \
 		\
 		avro_schema_t  wvalues = avro_schema_map_values(wschema); \
-		avro_consumer_t  *value_consumer = \
-		    AVRO_CONSUMER(tp, itype, iref)(wvalues); \
+		avro_specific_resolver_t  *value_consumer = \
+		    AVRO_CONSUMER(tp, itype, iref, wvalues); \
 		if (!value_consumer) { \
 			AVRO_DELETE_MEMOIZE(tp##_map_##name); \
-			avro_consumer_free(result); \
+			avro_consumer_free(&result->parent); \
 			avro_prefix_error("Map values aren't compatible: "); \
 			return NULL; \
 		} \
 		\
-		avro_consumer_allocate_children(result, 1); \
-		result->child_consumers[0] = value_consumer; \
-		result->callbacks.map_start_block = \
+		avro_consumer_allocate_children(&result->parent, 1); \
+		result->parent.child_consumers[0] = &value_consumer->parent; \
+		result->parent.callbacks.map_start_block = \
 		    tp##_map_##name##_start_block; \
-		result->callbacks.map_element = \
+		result->parent.callbacks.map_element = \
 		    tp##_map_##name##_map_element; \
 		\
 		return result; \
+	} \
+	\
+	avro_specific_resolver_t * \
+	tp##_map_##name##_resolver_memoized(avro_memoize_t *mem, \
+					    avro_schema_t wschema) \
+	{ \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_map_##name); \
+		AVRO_TRY_NONUNION(tp##_map_##name); \
 	} \
 	\
 	AVRO_NEW(tp##_map_##name)
@@ -344,6 +466,12 @@
 				   void **field_user_data, \
 				   void *user_data) \
 	{ \
+		avro_specific_resolver_t  *resolver = \
+		    (avro_specific_resolver_t *) consumer; \
+		if (resolver->branch_selector) { \
+			user_data = resolver->branch_selector(user_data); \
+		} \
+		\
 		if (consumer->child_consumers[index]) { \
 			*field_consumer = consumer->child_consumers[index]; \
 			size_t  field_offset = (size_t) \
@@ -353,12 +481,11 @@
 		return 0; \
 	} \
 	\
-	\
 	AVRO_MEMOIZE_KEY(tp##_##name); \
 	\
-	avro_consumer_t * \
-	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
-					avro_schema_t wschema) \
+	static avro_specific_resolver_t * \
+	tp##_##name##_resolver_try(avro_memoize_t *mem, \
+				   avro_schema_t wschema) \
 	{ \
 		if (!is_avro_record(wschema)) { \
 			avro_set_error("Cannot store %s into record", \
@@ -372,18 +499,17 @@
 			return NULL; \
 		} \
 		\
-		avro_consumer_t  *result = NULL; \
-		AVRO_CHECK_MEMOIZE(tp##_##name); \
-		\
-		result = avro_new(avro_consumer_t); \
-		memset(result, 0, sizeof(avro_consumer_t)); \
-		result->schema = avro_schema_incref(wschema); \
+		avro_specific_resolver_t  *result = \
+		    avro_new(avro_specific_resolver_t); \
+		memset(result, 0, sizeof(avro_specific_resolver_t)); \
+		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
-		result->callbacks.record_field = \
+		result->parent.callbacks.record_field = \
 		    tp##_##name##_record_field; \
 		\
 		size_t  wfields = avro_schema_record_size(wschema); \
-		avro_consumer_allocate_children(result, wfields); \
+		avro_consumer_allocate_children(&result->parent, wfields); \
 
 #define AVRO_RECORD_FIELD(tp, name, idx, field, ftype, fref, first, last) \
 		{ \
@@ -398,15 +524,16 @@
 			\
 			avro_schema_t  wfield = \
 			    avro_schema_record_field_get_by_index(wschema, widx); \
-			avro_consumer_t  *field_consumer = \
-			    AVRO_CONSUMER(tp, ftype, fref)(wfield); \
+			avro_specific_resolver_t  *field_consumer = \
+			    AVRO_CONSUMER(tp, ftype, fref, wfield); \
 			if (!field_consumer) { \
 				avro_prefix_error \
 				("Field " #field " isn't compatible: "); \
 				goto error; \
 			} \
-			result->child_consumers[widx] = field_consumer; \
-			result->child_user_data[widx] = (void *) \
+			result->parent.child_consumers[widx] = \
+			    &field_consumer->parent; \
+			result->parent.child_user_data[widx] = (void *) \
 			    (offsetof(tp##_##name##_t, field)); \
 		}
 
@@ -415,21 +542,58 @@
 		\
 	error: \
 		AVRO_DELETE_MEMOIZE(tp##_##name); \
-		avro_consumer_free(result); \
+		avro_consumer_free(&result->parent); \
 		return NULL; \
+	} \
+	\
+	avro_specific_resolver_t * \
+	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
+					avro_schema_t wschema) \
+	{ \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		AVRO_TRY_NONUNION(tp##_##name); \
 	} \
 	\
 	AVRO_NEW(tp##_##name)
 
 
 #define AVRO_UNION_START(tp, name) \
+	AVRO_MEMOIZE_KEY(tp##_##name); \
 	\
-	avro_consumer_t * \
+	static avro_specific_resolver_t * \
+	tp##_##name##_resolver_try(avro_memoize_t *mem, \
+				  avro_schema_t wschema) \
+	{ \
+		if (is_avro_union(wschema)) { \
+			return NULL; \
+		}
+
+#define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last) \
+		{ \
+			avro_specific_resolver_t  *result = \
+			    AVRO_CONSUMER(tp, btype, bref, wschema); \
+			if (result) { \
+				result->branch_selector = \
+				    (avro_specific_branch_selector_t) \
+				    AVRO_UNION_SET_NAME \
+				    (tp, name, AVRO_TYPE_NAME(btype, bref)); \
+				AVRO_SET_MEMOIZE(tp##_##name); \
+				return result; \
+			} \
+		}
+
+#define AVRO_UNION_END(tp, name) \
+		return NULL; \
+	} \
+	\
+	avro_specific_resolver_t * \
 	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
 					avro_schema_t wschema) \
 	{ \
-		(void) mem; \
-		(void) wschema; \
+		avro_specific_resolver_t  *result = NULL; \
+		AVRO_CHECK_MEMOIZE(tp##_##name); \
+		AVRO_TRY_NONUNION(tp##_##name); \
 		return NULL; \
 	} \
 	\
@@ -439,8 +603,6 @@
 #define AVRO_FORWARD(tp, type, name)                                  /* nothing */
 #define AVRO_ENUM_SYMBOL(TP, NAME, symbol, value, first, last)        /* nothing */
 #define AVRO_ENUM_END(tp, name)                                       /* nothing */
-#define AVRO_UNION_BRANCH(tp, name, index, btype, bref, first, last)  /* nothing */
-#define AVRO_UNION_END(tp, name)                                      /* nothing */
 
 
 /* Call SCHEMA_DEFINITION to generate the code */
@@ -449,6 +611,23 @@ SCHEMA_DEFINITION()
 
 
 /* Undefine everything when we're done */
+
+#undef AVRO_TYPE_NAME
+#undef AVRO_TYPE_NAME_boolean
+#undef AVRO_TYPE_NAME_bytes
+#undef AVRO_TYPE_NAME_float
+#undef AVRO_TYPE_NAME_double
+#undef AVRO_TYPE_NAME_int
+#undef AVRO_TYPE_NAME_long
+#undef AVRO_TYPE_NAME_null
+#undef AVRO_TYPE_NAME_string
+#undef AVRO_TYPE_NAME_array
+#undef AVRO_TYPE_NAME_enum
+#undef AVRO_TYPE_NAME_fixed
+#undef AVRO_TYPE_NAME_map
+#undef AVRO_TYPE_NAME_record
+#undef AVRO_TYPE_NAME_recursive
+#undef AVRO_TYPE_NAME_union
 
 #undef AVRO_CONSUMER
 #undef AVRO_CONSUMER_boolean
@@ -466,6 +645,9 @@ SCHEMA_DEFINITION()
 #undef AVRO_CONSUMER_record
 #undef AVRO_CONSUMER_recursive
 #undef AVRO_CONSUMER_union
+
+#undef AVRO_UNION_SET_NAME
+#undef AVRO_UNION_SET_NAME_
 
 #undef AVRO_NEW
 #undef AVRO_MEMOIZE_KEY

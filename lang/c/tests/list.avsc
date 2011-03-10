@@ -11,6 +11,7 @@
           { "name": "y", "type": "int" }
         ]
       } },
+    { "name": "size", "type": ["null","long"] },
     { "name": "scheme", "type":
       { "type": "enum", "name": "scheme",
         "symbols": [ "POLAR", "RECTANGULAR" ] }},

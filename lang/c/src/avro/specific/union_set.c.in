@@ -105,7 +105,7 @@
 
 
 #define AVRO_UNION_SET_PROTOTYPE_(tp, name, bname) \
-	void tp##_##name##_set_##bname(tp##_##name##_t *obj)
+	void *tp##_##name##_set_##bname(tp##_##name##_t *obj)
 #define AVRO_UNION_SET_PROTOTYPE(tp, name, bname) \
 	AVRO_UNION_SET_PROTOTYPE_(tp, name, bname)
 
@@ -121,6 +121,7 @@
 				       branch.AVRO_TYPE_FIELD(btype, bref)); \
 			obj->discriminant = index; \
 		} \
+		return &obj->branch.AVRO_TYPE_FIELD(btype, bref); \
 	}
 
 #define AVRO_FORWARD(tp, type, name)                                  /* nothing */

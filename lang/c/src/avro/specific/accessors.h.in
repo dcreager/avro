@@ -70,7 +70,7 @@
 
 
 #define AVRO_UNION_SET_(tp, name, bname) \
-	void tp##_##name##_set_##bname(tp##_##name##_t *obj);
+	void *tp##_##name##_set_##bname(tp##_##name##_t *obj);
 #define AVRO_UNION_SET(tp, name, bname) AVRO_UNION_SET_(tp, name, bname)
 
 

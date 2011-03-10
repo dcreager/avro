@@ -475,17 +475,51 @@ test_map(void)
 }
 
 static int
+test_union(void)
+{
+	specific_null_long_t  nl1;
+	specific_null_long_init(&nl1);
+	specific_null_long_set_long(&nl1);
+	nl1.branch.long_val = 506;
+
+	specific_null_long_t  nl2;
+	specific_null_long_init(&nl2);
+	specific_null_long_set_long(&nl2);
+	nl2.branch.long_val = 506;
+
+	if (!specific_null_long_equals(&nl1, &nl2)) {
+		fprintf(stderr, "Values should be equal.\n");
+		return EXIT_FAILURE;
+	}
+
+	avro_datum_t  datum1 = avro_int64(506);
+	write_read_test(datum1, nl1, nl2, specific_null_long);
+	avro_datum_decref(datum1);
+
+	specific_null_long_set_null(&nl1);
+	specific_null_long_set_null(&nl2);
+
+	avro_datum_t  datum2 = avro_null();
+	write_read_test(datum2, nl1, nl2, specific_null_long);
+	avro_datum_decref(datum2);
+
+	specific_null_long_done(&nl1);
+	specific_null_long_done(&nl2);
+	return EXIT_SUCCESS;
+}
+
+static int
 test_record(void)
 {
 	specific_point_t  point1;
 	specific_point_init(&point1);
-        point1.x = 5;
-        point1.y = 2;
+	point1.x = 5;
+	point1.y = 2;
 
 	specific_point_t  point2;
 	specific_point_init(&point2);
-        point2.x = 5;
-        point2.y = 2;
+	point2.x = 5;
+	point2.y = 2;
 
 	if (!specific_point_equals(&point1, &point2)) {
 		fprintf(stderr, "Values should be equal.\n");
@@ -503,7 +537,7 @@ test_record(void)
 	avro_datum_decref(datum);
 	specific_point_done(&point1);
 	specific_point_done(&point2);
-        return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 static int
@@ -511,24 +545,28 @@ test_nested(void)
 {
 	specific_list_t  list1;
 	specific_list_init(&list1);
-        list1.point.x = 5;
-        list1.point.y = 2;
-        memcpy(list1.ip.contents,
+	list1.point.x = 5;
+	list1.point.y = 2;
+	specific_null_long_set_null(&list1.size);
+	memcpy(list1.ip.contents,
 	       "\xc0\xa8\x00\x01", sizeof(list1.ip.contents));
 	specific_null_list_set_list(&list1.next);
-        list1.next.branch.list->point.x = 1;
-        list1.next.branch.list->point.y = 1;
+	list1.next.branch.list->point.x = 1;
+	list1.next.branch.list->point.y = 1;
+	specific_null_long_set_null(&list1.next.branch.list->size);
 	specific_null_list_set_null(&list1.next.branch.list->next);
 
 	specific_list_t  list2;
 	specific_list_init(&list2);
-        list2.point.x = 5;
-        list2.point.y = 2;
-        memcpy(list2.ip.contents,
+	list2.point.x = 5;
+	list2.point.y = 2;
+	specific_null_long_set_null(&list2.size);
+	memcpy(list2.ip.contents,
 	       "\xc0\xa8\x00\x01", sizeof(list2.ip.contents));
 	specific_null_list_set_list(&list2.next);
-        list2.next.branch.list->point.x = 1;
-        list2.next.branch.list->point.y = 1;
+	list2.next.branch.list->point.x = 1;
+	list2.next.branch.list->point.y = 1;
+	specific_null_long_set_null(&list2.next.branch.list->size);
 	specific_null_list_set_null(&list2.next.branch.list->next);
 
 	if (!specific_list_equals(&list1, &list2)) {
@@ -538,7 +576,7 @@ test_nested(void)
 
 	specific_list_done(&list1);
 	specific_list_done(&list2);
-        return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 int main(void)
@@ -561,6 +599,7 @@ int main(void)
 		{ "enum", test_enum },
 		{ "fixed", test_fixed },
 		{ "map", test_map },
+		{ "union", test_union },
 		{ "record", test_record },
 		{ "nested", test_nested }
 	};

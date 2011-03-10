@@ -27,7 +27,7 @@
 /* Define the macros that can be used in SCHEMA_DEFINITION */
 
 #define AVRO_ARRAY(tp, name, itype, iref) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_array_##name##_resolver_memoized(avro_memoize_t *mem, \
 					      avro_schema_t writer_schema); \
 	\
@@ -35,7 +35,7 @@
 	tp##_array_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_ENUM_START(tp, name) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
 					avro_schema_t writer_schema); \
 	\
@@ -43,7 +43,7 @@
 	tp##_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_FIXED(tp, name, size) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
 					avro_schema_t writer_schema); \
 	\
@@ -51,7 +51,7 @@
 	tp##_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_MAP(tp, name, itype, iref) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_map_##name##_resolver_memoized(avro_memoize_t *mem, \
 					    avro_schema_t writer_schema); \
 	\
@@ -59,7 +59,7 @@
 	tp##_map_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_RECORD_START(tp, name) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
 					avro_schema_t writer_schema); \
 	\
@@ -67,7 +67,7 @@
 	tp##_##name##_resolver_new(avro_schema_t writer_schema);
 
 #define AVRO_UNION_START(tp, name) \
-	avro_consumer_t * \
+	avro_specific_resolver_t * \
 	tp##_##name##_resolver_memoized(avro_memoize_t *mem, \
 					avro_schema_t writer_schema); \
 	\
