@@ -118,6 +118,38 @@ typedef struct avro_specific_resolver
  * by the avrocc schema compiler.
  */
 
+avro_specific_resolver_t *
+avro_raw_boolean_resolver_memoized(avro_memoize_t *mem,
+				   avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_bytes_resolver_memoized(avro_memoize_t *mem,
+				 avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_double_resolver_memoized(avro_memoize_t *mem,
+				  avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_float_resolver_memoized(avro_memoize_t *mem,
+				 avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_int_resolver_memoized(avro_memoize_t *mem,
+			       avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_long_resolver_memoized(avro_memoize_t *mem,
+				avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_null_resolver_memoized(avro_memoize_t *mem,
+				avro_schema_t wschema);
+
+avro_specific_resolver_t *
+avro_raw_string_resolver_memoized(avro_memoize_t *mem,
+				  avro_schema_t wschema);
+
 
 avro_consumer_t *
 avro_raw_boolean_resolver_new(avro_schema_t wschema);
@@ -142,6 +174,39 @@ avro_raw_null_resolver_new(avro_schema_t wschema);
 
 avro_consumer_t *
 avro_raw_string_resolver_new(avro_schema_t wschema);
+
+
+/*---------------------------------------------------------------------
+ * Writer unions
+ *
+ * To process a writer union with the schema-specific types, we try to
+ * resolve each branch of the writer union individually against the
+ * schema-specific type.  This gives us a consumer for each branch of
+ * the writer union, which we store in the child_consumers field of the
+ * consumer of the union itself.  We can implement all of this behavior
+ * without having to know any details about the schema-specific type; we
+ * just need to be given a function pointer that can resolve each writer
+ * union branch against the schema-specific type.
+ */
+
+/**
+ * The function that will try to resolve each branch of the writer union
+ * against the schema-specific type.
+ */
+
+typedef avro_specific_resolver_t *
+(*avro_specific_try_branch_func_t)(avro_memoize_t *mem,
+				   avro_schema_t wbranch);
+
+/**
+ * Creates a schema-specific resolver when the writer schema is a union.
+ */
+
+avro_specific_resolver_t *
+avro_specific_resolve_writer_union(avro_memoize_t *mem,
+				   void *rschema_key,
+				   avro_schema_t wschema,
+				   avro_specific_try_branch_func_t try_branch);
 
 
 CLOSE_EXTERN

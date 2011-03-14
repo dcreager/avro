@@ -55,21 +55,21 @@
 #define AVRO_CONSUMER(tp, type, ref, ws)  AVRO_CONSUMER_##type(tp, ref, ws)
 
 #define AVRO_CONSUMER_boolean(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_boolean_resolver_new(wschema)
+	avro_raw_boolean_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_bytes(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_bytes_resolver_new(wschema)
+	avro_raw_bytes_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_float(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_float_resolver_new(wschema)
+	avro_raw_float_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_double(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_double_resolver_new(wschema)
+	avro_raw_double_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_int(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_int_resolver_new(wschema)
+	avro_raw_int_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_long(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_long_resolver_new(wschema)
+	avro_raw_long_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_null(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_null_resolver_new(wschema)
+	avro_raw_null_resolver_memoized(mem, wschema)
 #define AVRO_CONSUMER_string(tp, ref, wschema) \
-	(avro_specific_resolver_t *) avro_raw_string_resolver_new(wschema)
+	avro_raw_string_resolver_memoized(mem, wschema)
 
 #define AVRO_CONSUMER_array(tp, ref, wschema) \
         tp##_array_##ref##_resolver_memoized(mem, wschema)
@@ -101,7 +101,7 @@
 		avro_specific_resolver_t  *result = \
 		    name##_resolver_memoized(&mem, wschema); \
 		avro_memoize_done(&mem); \
-		return &result->parent; \
+		return (result)? &result->parent: NULL; \
 	}
 
 #define AVRO_MEMOIZE_KEY(name) \
@@ -122,12 +122,24 @@
 #define AVRO_TRY_NONUNION(name) \
 	{ \
 		result = name##_resolver_try(mem, wschema); \
-		return result; \
+		if (result) { \
+			return result; \
+		} \
+	}
+
+#define AVRO_TRY_WRITER_UNION(name) \
+	{ \
+		result = avro_specific_resolve_writer_union \
+		    (mem, &name##_memoize_key, wschema, \
+		     name##_resolver_memoized); \
+		if (result) { \
+			return result; \
+		} \
 	}
 
 
 static void
-avro_raw_resolver_free(avro_consumer_t *consumer)
+avro_specific_resolver_free(avro_consumer_t *consumer)
 {
 	avro_specific_resolver_t  *resolver =
 	    (avro_specific_resolver_t *) consumer;
@@ -197,7 +209,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = \
 		    avro_new(avro_specific_resolver_t); \
 		memset(result, 0, sizeof(avro_specific_resolver_t)); \
-		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.callbacks.free = avro_specific_resolver_free; \
 		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_array_##name); \
 		\
@@ -228,6 +240,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_array_##name); \
 		AVRO_TRY_NONUNION(tp##_array_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_array_##name); \
 		return NULL; \
 	} \
 	\
@@ -271,7 +284,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = \
 		    avro_new(avro_specific_resolver_t); \
 		memset(result, 0, sizeof(avro_specific_resolver_t)); \
-		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.callbacks.free = avro_specific_resolver_free; \
 		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
 		\
@@ -288,6 +301,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_##name); \
 		AVRO_TRY_NONUNION(tp##_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_##name); \
 		return NULL; \
 	} \
 	\
@@ -338,7 +352,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = \
 		    avro_new(avro_specific_resolver_t); \
 		memset(result, 0, sizeof(avro_specific_resolver_t)); \
-		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.callbacks.free = avro_specific_resolver_free; \
 		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
 		\
@@ -355,6 +369,8 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_##name); \
 		AVRO_TRY_NONUNION(tp##_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_##name); \
+		return NULL; \
 	} \
 	\
 	AVRO_NEW(tp##_##name)
@@ -422,7 +438,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = \
 		    avro_new(avro_specific_resolver_t); \
 		memset(result, 0, sizeof(avro_specific_resolver_t)); \
-		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.callbacks.free = avro_specific_resolver_free; \
 		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_map_##name); \
 		\
@@ -453,6 +469,8 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_map_##name); \
 		AVRO_TRY_NONUNION(tp##_map_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_map_##name); \
+		return NULL; \
 	} \
 	\
 	AVRO_NEW(tp##_map_##name)
@@ -502,7 +520,7 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = \
 		    avro_new(avro_specific_resolver_t); \
 		memset(result, 0, sizeof(avro_specific_resolver_t)); \
-		result->parent.callbacks.free = avro_raw_resolver_free; \
+		result->parent.callbacks.free = avro_specific_resolver_free; \
 		result->parent.schema = avro_schema_incref(wschema); \
 		AVRO_SET_MEMOIZE(tp##_##name); \
 		result->parent.callbacks.record_field = \
@@ -553,6 +571,8 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_##name); \
 		AVRO_TRY_NONUNION(tp##_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_##name); \
+		return NULL; \
 	} \
 	\
 	AVRO_NEW(tp##_##name)
@@ -594,6 +614,8 @@ avro_raw_resolver_free(avro_consumer_t *consumer)
 		avro_specific_resolver_t  *result = NULL; \
 		AVRO_CHECK_MEMOIZE(tp##_##name); \
 		AVRO_TRY_NONUNION(tp##_##name); \
+		AVRO_TRY_WRITER_UNION(tp##_##name); \
+		return NULL; \
 		return NULL; \
 	} \
 	\

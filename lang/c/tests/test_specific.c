@@ -121,9 +121,19 @@ test_raw_boolean(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
 		avro_datum_t  datum = avro_boolean(i);
 		write_read_test(datum, value1, value2, avro_raw_boolean);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_boolean());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, value1, value2, avro_raw_boolean);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 	}
 
 	return EXIT_SUCCESS;
@@ -147,7 +157,16 @@ test_raw_bytes(void)
 
 	avro_datum_t  datum = avro_bytes("\xde\xad\xbe\xef", 4);
 	write_read_test(datum, str1, str2, avro_raw_bytes);
+
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_schema_union_append(uschema, avro_schema_bytes());
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, str1, str2, avro_raw_bytes);
+
 	avro_datum_decref(datum);
+	avro_schema_decref(uschema);
+	avro_datum_decref(udatum);
 
 	avro_raw_string_done(&str1);
 	avro_raw_string_done(&str2);
@@ -165,9 +184,19 @@ test_raw_double(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
 		avro_datum_t  datum = avro_double(value1);
 		write_read_test(datum, value1, value2, avro_raw_double);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_double());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, value1, value2, avro_raw_double);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 	}
 
 	return EXIT_SUCCESS;
@@ -184,9 +213,19 @@ test_raw_float(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
 		avro_datum_t  datum = avro_float(value1);
 		write_read_test(datum, value1, value2, avro_raw_float);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_float());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, value1, value2, avro_raw_float);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 	}
 
 	return EXIT_SUCCESS;
@@ -203,9 +242,19 @@ test_raw_int(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
 		avro_datum_t  datum = avro_int32(value1);
 		write_read_test(datum, value1, value2, avro_raw_int);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_int());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, value1, value2, avro_raw_int);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 	}
 
 	return EXIT_SUCCESS;
@@ -222,9 +271,19 @@ test_raw_long(void)
 			fprintf(stderr, "Values should be equal.\n");
 			return EXIT_FAILURE;
 		}
+
 		avro_datum_t  datum = avro_int64(value1);
 		write_read_test(datum, value1, value2, avro_raw_long);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_long());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, value1, value2, avro_raw_long);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 	}
 
 	return EXIT_SUCCESS;
@@ -242,7 +301,16 @@ test_raw_null(void)
 
 	avro_datum_t  datum = avro_null();
 	write_read_test(datum, value1, value2, avro_raw_null);
+
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_boolean());
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, value1, value2, avro_raw_null);
+
 	avro_datum_decref(datum);
+	avro_schema_decref(uschema);
+	avro_datum_decref(udatum);
 
 	return EXIT_SUCCESS;
 }
@@ -273,7 +341,16 @@ test_raw_string(void)
 
 		avro_datum_t  datum = avro_string(strings[i]);
 		write_read_test(datum, str1, str2, avro_raw_string);
+
+		avro_schema_t  uschema = avro_schema_union();
+		avro_schema_union_append(uschema, avro_schema_null());
+		avro_schema_union_append(uschema, avro_schema_string());
+		avro_datum_t  udatum = avro_union(uschema, 1, datum);
+		write_read_test(udatum, str1, str2, avro_raw_string);
+
 		avro_datum_decref(datum);
+		avro_schema_decref(uschema);
+		avro_datum_decref(udatum);
 
 		avro_raw_string_done(&str1);
 		avro_raw_string_done(&str2);
@@ -334,6 +411,14 @@ test_array(void)
 
 	write_read_test(datum, array, array2, specific_array_double);
 
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_schema_union_append(uschema, schema);
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, array, array2, specific_array_double);
+	avro_schema_decref(uschema);
+	avro_datum_decref(udatum);
+
 	specific_array_double_clear(&array);
 	if (specific_array_double_size(&array) != 0) {
 		fprintf(stderr, "Array should be empty after clearing.\n");
@@ -360,8 +445,16 @@ test_enum(void)
 
 	avro_schema_t  schema = specific_scheme_schema();
 	avro_datum_t  datum = avro_enum(schema, 1);
-
 	write_read_test(datum, value1, value2, specific_scheme);
+
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_schema_union_append(uschema, schema);
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, value1, value2, specific_scheme);
+
+	avro_datum_decref(udatum);
+	avro_schema_decref(uschema);
 
 	avro_schema_decref(schema);
 	avro_datum_decref(datum);
@@ -381,8 +474,16 @@ test_fixed(void)
 
 	avro_schema_t  schema = specific_ipv4_schema();
 	avro_datum_t  datum = avro_fixed(schema, "\xde\xad\xbe\xef", 4);
-
 	write_read_test(datum, value1, value2, specific_ipv4);
+
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_schema_union_append(uschema, schema);
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, value1, value2, specific_ipv4);
+
+	avro_datum_decref(udatum);
+	avro_schema_decref(uschema);
 
 	avro_schema_decref(schema);
 	avro_datum_decref(datum);
@@ -461,6 +562,15 @@ test_map(void)
 
 	write_read_test(datum, map, map2, specific_map_string);
 
+	avro_schema_t  uschema = avro_schema_union();
+	avro_schema_union_append(uschema, avro_schema_null());
+	avro_schema_union_append(uschema, schema);
+	avro_datum_t  udatum = avro_union(uschema, 1, datum);
+	write_read_test(udatum, map, map2, specific_map_string);
+
+	avro_datum_decref(udatum);
+	avro_schema_decref(uschema);
+
 	specific_map_string_clear(&map);
 	if (specific_map_string_size(&map) != 0) {
 		fprintf(stderr, "map should be empty after clearing.\n");
@@ -492,16 +602,26 @@ test_union(void)
 		return EXIT_FAILURE;
 	}
 
+	avro_schema_t  schema = specific_null_long_schema();
 	avro_datum_t  datum1 = avro_int64(506);
+	avro_datum_t  udatum1 = avro_union(schema, 1, datum1);
+	avro_datum_t  datum2 = avro_null();
+	avro_datum_t  udatum2 = avro_union(schema, 0, datum2);
+
 	write_read_test(datum1, nl1, nl2, specific_null_long);
-	avro_datum_decref(datum1);
+	write_read_test(udatum1, nl1, nl2, specific_null_long);
 
 	specific_null_long_set_null(&nl1);
 	specific_null_long_set_null(&nl2);
 
-	avro_datum_t  datum2 = avro_null();
 	write_read_test(datum2, nl1, nl2, specific_null_long);
+	write_read_test(udatum2, nl1, nl2, specific_null_long);
+
+	avro_schema_decref(schema);
+	avro_datum_decref(datum1);
+	avro_datum_decref(udatum1);
 	avro_datum_decref(datum2);
+	avro_datum_decref(udatum2);
 
 	specific_null_long_done(&nl1);
 	specific_null_long_done(&nl2);
