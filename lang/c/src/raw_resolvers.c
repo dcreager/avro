@@ -134,6 +134,7 @@ avro_raw_bytes_value(avro_consumer_t *consumer,
 	}
 	avro_raw_string_t  *dest = user_data;
 	avro_raw_string_set_length(dest, value, value_len);
+	avro_free((void *) value, value_len+1);
 	return 0;
 }
 
@@ -391,6 +392,7 @@ avro_raw_string_value(avro_consumer_t *consumer,
 	}
 	avro_raw_string_t  *dest = user_data;
 	avro_raw_string_set_length(dest, value, value_len);
+	avro_free((void *) value, value_len);
 	return 0;
 }
 

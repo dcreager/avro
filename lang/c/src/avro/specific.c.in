@@ -50,4 +50,5 @@
 #include <avro/specific/schema.c.in>
 #include <avro/specific/union_set.c.in>
 #include <avro/specific/comparison.c.in>
+#include <avro/specific/consume.c.in>
 #include <avro/specific/resolver.c.in>

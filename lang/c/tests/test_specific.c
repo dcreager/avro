@@ -89,6 +89,30 @@ static char buf[4096];
 	avro_writer_free(writer); \
 }
 
+#define consume_test(datum, val, basename) \
+{ \
+	avro_schema_t  wschema = basename##_schema(); \
+	avro_schema_t  rschema = avro_datum_get_schema(datum); \
+	\
+	avro_consumer_t  *consumer = avro_resolver_new(wschema, rschema); \
+	avro_datum_t  actual = avro_datum_from_schema(rschema); \
+	\
+	if (basename##_consume(&val, consumer, actual)) { \
+		fprintf(stderr, "Unable to consume: %s\n", \
+			avro_strerror()); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	if (!avro_datum_equal(actual, datum)) { \
+		fprintf(stderr, "Roundtrip value doesn't match\n"); \
+		return EXIT_FAILURE; \
+	} \
+	\
+	avro_consumer_free(consumer); \
+	avro_datum_decref(actual); \
+	avro_schema_decref(wschema); \
+}
+
 static int
 test_lifecycle(void)
 {
@@ -124,12 +148,14 @@ test_raw_boolean(void)
 
 		avro_datum_t  datum = avro_boolean(i);
 		write_read_test(datum, value1, value2, avro_raw_boolean);
+		consume_test(datum, value1, avro_raw_boolean);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_boolean());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, value1, value2, avro_raw_boolean);
+		consume_test(udatum, value1, avro_raw_boolean);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -157,12 +183,14 @@ test_raw_bytes(void)
 
 	avro_datum_t  datum = avro_bytes("\xde\xad\xbe\xef", 4);
 	write_read_test(datum, str1, str2, avro_raw_bytes);
+	consume_test(datum, str1, avro_raw_bytes);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_schema_union_append(uschema, avro_schema_bytes());
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, str1, str2, avro_raw_bytes);
+	consume_test(udatum, str1, avro_raw_bytes);
 
 	avro_datum_decref(datum);
 	avro_schema_decref(uschema);
@@ -187,12 +215,14 @@ test_raw_double(void)
 
 		avro_datum_t  datum = avro_double(value1);
 		write_read_test(datum, value1, value2, avro_raw_double);
+		consume_test(datum, value1, avro_raw_double);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_double());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, value1, value2, avro_raw_double);
+		consume_test(udatum, value1, avro_raw_double);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -216,12 +246,14 @@ test_raw_float(void)
 
 		avro_datum_t  datum = avro_float(value1);
 		write_read_test(datum, value1, value2, avro_raw_float);
+		consume_test(datum, value1, avro_raw_float);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_float());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, value1, value2, avro_raw_float);
+		consume_test(udatum, value1, avro_raw_float);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -245,12 +277,14 @@ test_raw_int(void)
 
 		avro_datum_t  datum = avro_int32(value1);
 		write_read_test(datum, value1, value2, avro_raw_int);
+		consume_test(datum, value1, avro_raw_int);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_int());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, value1, value2, avro_raw_int);
+		consume_test(udatum, value1, avro_raw_int);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -274,12 +308,14 @@ test_raw_long(void)
 
 		avro_datum_t  datum = avro_int64(value1);
 		write_read_test(datum, value1, value2, avro_raw_long);
+		consume_test(datum, value1, avro_raw_long);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_long());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, value1, value2, avro_raw_long);
+		consume_test(udatum, value1, avro_raw_long);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -301,12 +337,14 @@ test_raw_null(void)
 
 	avro_datum_t  datum = avro_null();
 	write_read_test(datum, value1, value2, avro_raw_null);
+	consume_test(datum, value1, avro_raw_null);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_boolean());
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, value1, value2, avro_raw_null);
+	consume_test(udatum, value1, avro_raw_null);
 
 	avro_datum_decref(datum);
 	avro_schema_decref(uschema);
@@ -341,12 +379,14 @@ test_raw_string(void)
 
 		avro_datum_t  datum = avro_string(strings[i]);
 		write_read_test(datum, str1, str2, avro_raw_string);
+		consume_test(datum, str1, avro_raw_string);
 
 		avro_schema_t  uschema = avro_schema_union();
 		avro_schema_union_append(uschema, avro_schema_null());
 		avro_schema_union_append(uschema, avro_schema_string());
 		avro_datum_t  udatum = avro_union(uschema, 1, datum);
 		write_read_test(udatum, str1, str2, avro_raw_string);
+		consume_test(udatum, str1, avro_raw_string);
 
 		avro_datum_decref(datum);
 		avro_schema_decref(uschema);
@@ -410,12 +450,14 @@ test_array(void)
 	avro_datum_decref(delement);
 
 	write_read_test(datum, array, array2, specific_array_double);
+	consume_test(datum, array, specific_array_double);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_schema_union_append(uschema, schema);
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, array, array2, specific_array_double);
+	consume_test(udatum, array, specific_array_double);
 	avro_schema_decref(uschema);
 	avro_datum_decref(udatum);
 
@@ -446,12 +488,14 @@ test_enum(void)
 	avro_schema_t  schema = specific_scheme_schema();
 	avro_datum_t  datum = avro_enum(schema, 1);
 	write_read_test(datum, value1, value2, specific_scheme);
+	consume_test(datum, value1, specific_scheme);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_schema_union_append(uschema, schema);
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, value1, value2, specific_scheme);
+	consume_test(udatum, value1, specific_scheme);
 
 	avro_datum_decref(udatum);
 	avro_schema_decref(uschema);
@@ -475,12 +519,14 @@ test_fixed(void)
 	avro_schema_t  schema = specific_ipv4_schema();
 	avro_datum_t  datum = avro_fixed(schema, "\xde\xad\xbe\xef", 4);
 	write_read_test(datum, value1, value2, specific_ipv4);
+	consume_test(datum, value1, specific_ipv4);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_schema_union_append(uschema, schema);
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, value1, value2, specific_ipv4);
+	consume_test(udatum, value1, specific_ipv4);
 
 	avro_datum_decref(udatum);
 	avro_schema_decref(uschema);
@@ -561,12 +607,14 @@ test_map(void)
 	avro_datum_decref(delement);
 
 	write_read_test(datum, map, map2, specific_map_string);
+	consume_test(datum, map, specific_map_string);
 
 	avro_schema_t  uschema = avro_schema_union();
 	avro_schema_union_append(uschema, avro_schema_null());
 	avro_schema_union_append(uschema, schema);
 	avro_datum_t  udatum = avro_union(uschema, 1, datum);
 	write_read_test(udatum, map, map2, specific_map_string);
+	consume_test(udatum, map, specific_map_string);
 
 	avro_datum_decref(udatum);
 	avro_schema_decref(uschema);
@@ -609,13 +657,17 @@ test_union(void)
 	avro_datum_t  udatum2 = avro_union(schema, 0, datum2);
 
 	write_read_test(datum1, nl1, nl2, specific_null_long);
+	consume_test(datum1, nl1, specific_null_long);
 	write_read_test(udatum1, nl1, nl2, specific_null_long);
+	consume_test(udatum1, nl1, specific_null_long);
 
 	specific_null_long_set_null(&nl1);
 	specific_null_long_set_null(&nl2);
 
 	write_read_test(datum2, nl1, nl2, specific_null_long);
+	consume_test(datum2, nl1, specific_null_long);
 	write_read_test(udatum2, nl1, nl2, specific_null_long);
+	consume_test(udatum2, nl1, specific_null_long);
 
 	avro_schema_decref(schema);
 	avro_datum_decref(datum1);
@@ -648,10 +700,16 @@ test_record(void)
 
 	avro_schema_t  schema = specific_point_schema();
 	avro_datum_t  datum = avro_record(schema);
-	avro_record_set(datum, "x", avro_int32(5));
-	avro_record_set(datum, "y", avro_int32(2));
+	avro_datum_t  field;
+	field = avro_int32(5);
+	avro_record_set(datum, "x", field);
+	avro_datum_decref(field);
+	field = avro_int32(2);
+	avro_record_set(datum, "y", field);
+	avro_datum_decref(field);
 
 	write_read_test(datum, point1, point2, specific_point);
+	consume_test(datum, point1, specific_point);
 
 	avro_schema_decref(schema);
 	avro_datum_decref(datum);

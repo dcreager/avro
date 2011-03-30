@@ -31,6 +31,7 @@ set(AVRO_SRC
     avro/specific.h.in
     avro/specific/array.c.in
     avro/specific/comparison.c.in
+    avro/specific/consume.c.in
     avro/specific/done.c.in
     avro/specific/init.c.in
     avro/specific/map.c.in
@@ -38,6 +39,7 @@ set(AVRO_SRC
     avro/specific/union_set.c.in
     avro/specific/accessors.h.in
     avro/specific/comparison.h.in
+    avro/specific/consume.h.in
     avro/specific/lifecycle.h.in
     avro/specific/resolver.h.in
     avro/specific/typedef.h.in
@@ -62,6 +64,7 @@ set(AVRO_SRC
     map.c
     memoize.c
     raw_compare.c
+    raw_consume.c
     raw_resolvers.c
     resolver.c
     schema.c

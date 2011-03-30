@@ -43,6 +43,14 @@ typedef int  avro_raw_null_t;
 /* Ha!  This one was well-named. */
 /* typedef avro_raw_string_t  avro_raw_string_t; */
 
+#define avro_raw_boolean_schema  avro_schema_boolean
+#define avro_raw_bytes_schema  avro_schema_bytes
+#define avro_raw_double_schema  avro_schema_double
+#define avro_raw_float_schema  avro_schema_float
+#define avro_raw_int_schema  avro_schema_int
+#define avro_raw_long_schema  avro_schema_long
+#define avro_raw_null_schema  avro_schema_null
+#define avro_raw_string_schema  avro_schema_string
 
 /*---------------------------------------------------------------------
  * “Raw” comparison
@@ -108,6 +116,52 @@ typedef struct avro_specific_resolver
 
 } avro_specific_resolver_t;
 
+
+/*---------------------------------------------------------------------
+ * “Raw” consumption
+ *
+ * These functions pass “raw” primitive values into a consumer.
+ */
+
+int
+avro_raw_boolean_consume(const avro_raw_boolean_t *value,
+			 avro_consumer_t *consumer,
+			 void *ud);
+
+int
+avro_raw_bytes_consume(const avro_raw_bytes_t *value,
+		       avro_consumer_t *consumer,
+		       void *ud);
+
+int
+avro_raw_double_consume(const avro_raw_double_t *value,
+			avro_consumer_t *consumer,
+			void *ud);
+
+int
+avro_raw_float_consume(const avro_raw_float_t *value,
+		       avro_consumer_t *consumer,
+		       void *ud);
+
+int
+avro_raw_int_consume(const const avro_raw_int_t *value,
+		     avro_consumer_t *consumer,
+		     void *ud);
+
+int
+avro_raw_long_consume(const avro_raw_long_t *value,
+		      avro_consumer_t *consumer,
+		      void *ud);
+
+int
+avro_raw_null_consume(const avro_raw_null_t *value,
+		      avro_consumer_t *consumer,
+		      void *ud);
+
+int
+avro_raw_string_consume(const avro_raw_string_t *value,
+			avro_consumer_t *consumer,
+			void *ud);
 
 /*---------------------------------------------------------------------
  * “Raw” resolvers

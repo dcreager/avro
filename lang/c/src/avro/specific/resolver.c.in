@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <avro.h>
+#include <avro/allocation.h>
 #include <avro/consumer.h>
 #include <avro/data.h>
 #include <avro/errors.h>
@@ -323,6 +324,7 @@ avro_specific_resolver_free(avro_consumer_t *consumer)
 		(void) value_len; \
 		tp##_##name##_t  *obj = user_data; \
 		memcpy(obj->contents, value, size); \
+		avro_free((void *) value, value_len); \
 		return 0; \
 	} \
 	\

@@ -144,4 +144,5 @@
 #include <avro/specific/lifecycle.h.in>
 #include <avro/specific/accessors.h.in>
 #include <avro/specific/comparison.h.in>
+#include <avro/specific/consume.h.in>
 #include <avro/specific/resolver.h.in>

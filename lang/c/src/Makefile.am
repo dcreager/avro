@@ -17,6 +17,7 @@ avro/specific.h.in \
 avro/specific.c.in \
 avro/specific/array.c.in \
 avro/specific/comparison.c.in \
+avro/specific/consume.c.in \
 avro/specific/done.c.in \
 avro/specific/init.c.in \
 avro/specific/map.c.in \
@@ -24,6 +25,7 @@ avro/specific/resolver.c.in \
 avro/specific/union_set.c.in \
 avro/specific/accessors.h.in \
 avro/specific/comparison.h.in \
+avro/specific/consume.h.in \
 avro/specific/lifecycle.h.in \
 avro/specific/resolver.h.in \
 avro/specific/typedef.h.in
@@ -35,7 +37,7 @@ datum.c datum_equal.c datum_validate.c datum_read.c datum_skip.c datum_write.c d
 datum_json.c \
 array.c map.c memoize.c string.c \
 consumer.c resolver.c \
-raw_compare.c raw_resolvers.c \
+raw_compare.c raw_consume.c raw_resolvers.c \
 io.c dump.c dump.h encoding_binary.c \
 allocation.c \
 avro_private.h encoding.h datafile.c \
