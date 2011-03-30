@@ -24,16 +24,33 @@
 #include "st.h"
 
 
+#define raw_entry_size(element_size) \
+	(sizeof(avro_raw_map_entry_t) + element_size)
+
 void avro_raw_map_init(avro_raw_map_t *map, size_t element_size)
 {
 	memset(map, 0, sizeof(avro_raw_map_t));
-	avro_raw_array_init(&map->elements, element_size);
+	avro_raw_array_init(&map->elements, raw_entry_size(element_size));
 	map->indices_by_key = st_init_strtable();
+}
+
+
+static void
+avro_raw_map_free_keys(avro_raw_map_t *map)
+{
+	unsigned int  i;
+	for (i = 0; i < avro_raw_map_size(map); i++) {
+		void  *ventry =
+		    (map->elements.data + map->elements.element_size * i);
+		avro_raw_map_entry_t  *entry = ventry;
+		avro_str_free((char *) entry->key);
+	}
 }
 
 
 void avro_raw_map_done(avro_raw_map_t *map)
 {
+	avro_raw_map_free_keys(map);
 	avro_raw_array_done(&map->elements);
 	st_free_table(map->indices_by_key);
 	memset(map, 0, sizeof(avro_raw_map_t));
@@ -42,6 +59,7 @@ void avro_raw_map_done(avro_raw_map_t *map)
 
 void avro_raw_map_clear(avro_raw_map_t *map)
 {
+	avro_raw_map_free_keys(map);
 	avro_raw_array_clear(&map->elements);
 	st_free_table(map->indices_by_key);
 	map->indices_by_key = st_init_strtable();
@@ -64,7 +82,9 @@ void *avro_raw_map_get(const avro_raw_map_t *map, const char *key,
 		if (index) {
 			*index = i;
 		}
-		return (map->elements.data + map->elements.element_size * i);
+		void  *raw_entry =
+		    (map->elements.data + map->elements.element_size * i);
+		return raw_entry + sizeof(avro_raw_map_entry_t);
 	} else {
 		return NULL;
 	}
@@ -81,15 +101,21 @@ int avro_raw_map_get_or_create(avro_raw_map_t *map, const char *key,
 
 	if (st_lookup(map->indices_by_key, (st_data_t) key, &data)) {
 		i = (unsigned int) data;
-		el = (map->elements.data + map->elements.element_size * i);
+		void  *raw_entry =
+		    (map->elements.data + map->elements.element_size * i);
+		el = raw_entry + sizeof(avro_raw_map_entry_t);
 		is_new = 0;
 	} else {
 		i = map->elements.element_count;
-		el = avro_raw_array_append(&map->elements);
-		st_insert(map->indices_by_key, (st_data_t) key, (st_data_t) i);
-		if (!el) {
+		avro_raw_map_entry_t  *raw_entry =
+		    avro_raw_array_append(&map->elements);
+		raw_entry->key = avro_strdup(key);
+		st_insert(map->indices_by_key,
+			  (st_data_t) raw_entry->key, (st_data_t) i);
+		if (!raw_entry) {
 			return -ENOMEM;
 		}
+		el = ((void *) raw_entry) + sizeof(avro_raw_map_entry_t);
 		is_new = 1;
 	}
 

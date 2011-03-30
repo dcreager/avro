@@ -105,6 +105,14 @@ void *avro_raw_array_append(avro_raw_array_t *array);
  */
 
 /**
+ * The type of the elements in a map's elements array.
+ */
+
+typedef struct avro_raw_map_entry {
+	const char  *key;
+} avro_raw_map_entry_t;
+
+/**
  * A string-indexed map of fixed-size elements.
  */
 
@@ -153,7 +161,18 @@ avro_raw_map_ensure_size(avro_raw_map_t *map, size_t desired_count);
  */
 
 #define avro_raw_map_get_by_index(map, element_type, index) \
-	avro_raw_array_get(&((map)->elements), element_type, index)
+	(*((element_type *) \
+	   ((map)->elements.data + (map)->elements.element_size * index \
+	    + sizeof(avro_raw_map_entry_t))))
+
+/**
+ * Returns the key of the element with the given numeric index.
+ */
+
+#define avro_raw_map_get_key(map, index) \
+	(((avro_raw_map_entry_t *) \
+	  (map)->elements.data + (map)->elements.element_size * index) \
+	 ->key)
 
 /**
  * Returns the element of an avro_raw_map_t with the given string key.

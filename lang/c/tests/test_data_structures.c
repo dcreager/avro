@@ -112,6 +112,13 @@ test_map(void)
 		return EXIT_FAILURE;
 	}
 
+	if (strcmp(avro_raw_map_get_key(&map, 0), "x") != 0) {
+		fprintf(stderr, "Unexpected key for map element 0: "
+			"got \"%s\", expected \"%s\".\n",
+			avro_raw_map_get_key(&map, 0), "x");
+		return EXIT_FAILURE;
+	}
+
 	element = avro_raw_map_get(&map, "y", &index);
 	if (index != 1) {
 		fprintf(stderr, "Unexpected index for map element \"%s\": "
