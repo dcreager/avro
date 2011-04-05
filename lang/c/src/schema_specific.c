@@ -23,7 +23,10 @@
 #include <string.h>
 
 #include "avro.h"
+#include "avro/allocation.h"
+#include "avro/data.h"
 #include "avro/errors.h"
+#include "avro/specific.h"
 #include "avro_private.h"
 #include "schema.h"
 #include "st.h"
@@ -41,16 +44,23 @@ strupcase(char *str)
 
 #define MAX_RECURSION_DEPTH  64
 
-typedef struct specific_ctx {
+struct avro_specific_gen_t {
+	const char  *filename_prefix;
 	const char  *type_prefix;
 	char  *upper_type_prefix;
+
+	size_t  def_length;
+	char  *def_filename;
+	char  *h_filename;
+	char  *c_filename;
+
 	avro_writer_t  writer;
 
 	st_table  *started_schemas;
 
 	unsigned int  stack_size;
 	avro_schema_t  schema_stack[MAX_RECURSION_DEPTH];
-} specific_ctx_t;
+};
 
 static int
 write(avro_writer_t writer, const char *fmt, ...)
@@ -73,60 +83,81 @@ write(avro_writer_t writer, const char *fmt, ...)
 	return 0;
 }
 
-static int
-write_union_name(specific_ctx_t *ctx, avro_schema_t schema)
+static void
+get_union_name(avro_raw_string_t *dest, avro_schema_t schema)
 {
-	int  rval;
 	size_t  num_branches = avro_schema_union_size(schema);
-	unsigned int  i;
+	size_t  i;
 	int  first = 1;
 
 	for (i = 0; i < num_branches; i++) {
 		if (first) {
 			first = 0;
 		} else {
-			check(rval, write(ctx->writer, "_"));
+			avro_raw_string_append(dest, "_");
 		}
 
 		avro_schema_t  branch = avro_schema_union_branch(schema, i);
-		check(rval, write(ctx->writer, "%s", avro_schema_type_name(branch)));
+		const char  *branch_name = avro_schema_type_name(branch);
+		avro_raw_string_append(dest, branch_name);
 	}
-
-	return 0;
 }
 
 static int
-write_array_map_name(specific_ctx_t *ctx, avro_schema_t items)
+write_union_name(avro_specific_gen_t *ctx, avro_schema_t schema)
 {
 	int  rval;
-	switch (avro_typeof(items)) {
+	avro_raw_string_t  name;
+	avro_raw_string_init(&name);
+	get_union_name(&name, schema);
+	rval = write(ctx->writer, "%s", avro_raw_string_get(&name));
+	avro_raw_string_done(&name);
+	return rval;
+}
+
+static void
+get_schema_name(avro_raw_string_t *dest, avro_schema_t schema)
+{
+	switch (avro_typeof(schema)) {
 		case AVRO_ARRAY:
-			check(rval, write(ctx->writer, "array_"));
-			return write_array_map_name
-			    (ctx, avro_schema_array_items(items));
+			avro_raw_string_append(dest, "array_");
+			get_schema_name(dest, avro_schema_array_items(schema));
+			return;
 
 		case AVRO_MAP:
-			check(rval, write(ctx->writer, "map_"));
-			return write_array_map_name
-			    (ctx, avro_schema_map_values(items));
+			avro_raw_string_append(dest, "map_");
+			get_schema_name(dest, avro_schema_map_values(schema));
+			return;
 
 		case AVRO_UNION:
-			return write_union_name(ctx, items);
+			get_union_name(dest, schema);
+			return;
 
 		default:
-			check(rval, write(ctx->writer, "%s",
-					  avro_schema_type_name(items)));
-			return 0;
+			avro_raw_string_append
+			    (dest, avro_schema_type_name(schema));
+			return;
 	}
 }
 
+static int
+write_array_map_name(avro_specific_gen_t *ctx, avro_schema_t schema)
+{
+	int  rval;
+	avro_raw_string_t  name;
+	avro_raw_string_init(&name);
+	get_schema_name(&name, schema);
+	rval = write(ctx->writer, "%s", avro_raw_string_get(&name));
+	avro_raw_string_done(&name);
+	return rval;
+}
 
 /**
  * Outputs a reference to the definition of an Avro schema.
  */
 
 static int
-avro_schema_type_ref(specific_ctx_t *ctx, avro_schema_t schema)
+avro_schema_type_ref(avro_specific_gen_t *ctx, avro_schema_t schema)
 {
 	int  rval;
 	switch (avro_typeof(schema)) {
@@ -214,7 +245,7 @@ avro_schema_type_ref(specific_ctx_t *ctx, avro_schema_t schema)
  */
 
 static int
-avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
+avro_schema_write_def(avro_specific_gen_t *ctx, avro_schema_t schema)
 {
 	int  rval;
 
@@ -234,7 +265,13 @@ avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
 	 * schema is recursive.)
 	 */
 
-	if (st_lookup(ctx->started_schemas, (st_data_t) schema, NULL)) {
+	avro_raw_string_t  name;
+	avro_raw_string_init(&name);
+	get_schema_name(&name, schema);
+	const char  *schema_name = avro_raw_string_get(&name);
+
+	if (st_lookup(ctx->started_schemas, (st_data_t) schema_name, NULL)) {
+		avro_raw_string_done(&name);
 		return 0;
 	}
 
@@ -244,12 +281,18 @@ avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
 	 */
 
 	if (ctx->stack_size == MAX_RECURSION_DEPTH) {
+		avro_raw_string_done(&name);
 		avro_set_error("Exceeded schema recursion depth");
 		return EINVAL;
 	}
 
+	schema_name = avro_strdup(avro_raw_string_get(&name));
+	avro_raw_string_done(&name);
+	fprintf(stderr, "Outputting definitions for %s...\n", schema_name);
+
 	ctx->schema_stack[ctx->stack_size++] = schema;
-	st_insert(ctx->started_schemas, (st_data_t) schema, (st_data_t) NULL);
+	st_insert(ctx->started_schemas,
+		  (st_data_t) schema_name, (st_data_t) NULL);
 
 	/*
 	 * Output forward declarations before recursing.
@@ -524,93 +567,214 @@ avro_schema_write_def(specific_ctx_t *ctx, avro_schema_t schema)
 }
 
 
-#define check_out(rval, call) { rval = call; if (rval) goto out; }
+#define check_out(rval, call) { rval = call; if (rval) goto error; }
+
+avro_specific_gen_t *
+avro_specific_gen_open(const char *output_path,
+		       const char *filename_prefix,
+		       const char *type_prefix)
+{
+	int  rval;
+	FILE  *fp;
+
+	avro_specific_gen_t  *ctx = avro_new(avro_specific_gen_t);
+	if (!ctx) {
+		return NULL;
+	}
+	memset(ctx, 0, sizeof(avro_specific_gen_t));
+
+	ctx->type_prefix = type_prefix;
+	ctx->upper_type_prefix = avro_strdup(ctx->type_prefix);
+	if (!ctx->upper_type_prefix) {
+		goto error;
+	}
+	strupcase(ctx->upper_type_prefix);
+
+	/* Create filename strings */
+
+	ctx->filename_prefix = filename_prefix;
+	ctx->def_length =
+	    snprintf(NULL, 0, "%s/%s.def",
+		     output_path, filename_prefix);
+
+	ctx->def_filename = avro_malloc(ctx->def_length+1);
+	if (!ctx->def_filename) {
+		goto error;
+	}
+
+	ctx->h_filename = avro_malloc(ctx->def_length+1-2);
+	if (!ctx->h_filename) {
+		goto error;
+	}
+
+	ctx->c_filename = avro_malloc(ctx->def_length+1-2);
+	if (!ctx->c_filename) {
+		goto error;
+	}
+
+	snprintf(ctx->def_filename, ctx->def_length+1,
+		 "%s/%s.def",
+		 output_path, filename_prefix);
+	snprintf(ctx->h_filename, ctx->def_length+1-2,
+		 "%s/%s.h",
+		 output_path, filename_prefix);
+	snprintf(ctx->c_filename, ctx->def_length+1-2,
+		 "%s/%s.c",
+		 output_path, filename_prefix);
+
+	/* Definition file */
+
+	fp = fopen(ctx->def_filename, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
+		goto error;
+	}
+
+	ctx->writer = avro_writer_file(fp);
+	check_out(rval, write(ctx->writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#define SCHEMA_DEFINITION() \\\n"));
+	ctx->started_schemas = st_init_strtable();
+	ctx->stack_size = 0;
+
+	return ctx;
+
+error:
+	if (ctx) {
+		if (ctx->def_filename) {
+			avro_free(ctx->def_filename, ctx->def_length+1);
+		}
+		if (ctx->h_filename) {
+			avro_free(ctx->h_filename, ctx->def_length+1-2);
+		}
+		if (ctx->c_filename) {
+			avro_free(ctx->c_filename, ctx->def_length+1-2);
+		}
+		if (ctx->upper_type_prefix) {
+			avro_str_free(ctx->upper_type_prefix);
+		}
+		avro_freet(avro_specific_gen_t, ctx);
+	}
+
+	return NULL;
+}
+
+
+int
+avro_specific_gen_output_schema(avro_specific_gen_t *ctx,
+				avro_schema_t schema)
+{
+	check_param(EINVAL, is_avro_schema(schema), "schema");
+	return avro_schema_write_def(ctx, schema);
+}
+
+
+static int
+started_schemas_free_foreach(char *key, void *value, void *arg)
+{
+	AVRO_UNUSED(arg);
+	AVRO_UNUSED(value);
+	avro_str_free(key);
+	return ST_DELETE;
+}
+
+
+int
+avro_specific_gen_close(avro_specific_gen_t *ctx)
+{
+	int  rval = 0;
+	FILE  *fp;
+
+	st_foreach(ctx->started_schemas, started_schemas_free_foreach, 0);
+	st_free_table(ctx->started_schemas);
+
+	check_out(rval,
+		  write(ctx->writer, "  /* end of schema definition */\n"));
+	avro_writer_free(ctx->writer);
+
+	/* Header file */
+
+	fp = fopen(ctx->h_filename, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
+		rval = errno;
+		goto error;
+	}
+
+	ctx->writer = avro_writer_file(fp);
+	check_out(rval, write(ctx->writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#include \"%s.def\"\n"
+		  "#include <avro/specific.h.in>\n"
+		  "#undef SCHEMA_DEFINITION\n",
+		  ctx->filename_prefix));
+	avro_writer_free(ctx->writer);
+
+	/* Source file */
+
+	fp = fopen(ctx->c_filename, "w");
+	if (!fp) {
+		avro_set_error(strerror(errno));
+		rval = errno;
+		goto error;
+	}
+
+	ctx->writer = avro_writer_file(fp);
+	check_out(rval, write(ctx->writer,
+		  "/* Autogenerated file.  Do not edit! */\n\n"
+		  "#include \"%s.h\"\n"
+		  "#include \"%s.def\"\n"
+		  "#include <avro/specific.c.in>\n"
+		  "#undef SCHEMA_DEFINITION\n",
+		  ctx->filename_prefix,
+		  ctx->filename_prefix));
+
+	rval = 0;
+
+error:
+	if (ctx->writer) {
+		avro_writer_free(ctx->writer);
+	}
+	if (ctx->def_filename) {
+		avro_free(ctx->def_filename, ctx->def_length+1);
+	}
+	if (ctx->h_filename) {
+		avro_free(ctx->h_filename, ctx->def_length+1-2);
+	}
+	if (ctx->c_filename) {
+		avro_free(ctx->c_filename, ctx->def_length+1-2);
+	}
+	if (ctx->upper_type_prefix) {
+		avro_str_free(ctx->upper_type_prefix);
+	}
+	avro_freet(avro_specific_gen_t, ctx);
+	return rval;
+}
+
 
 int avro_schema_to_specific(avro_schema_t schema,
 			    const char *output_path,
 			    const char *filename_prefix,
 			    const char *type_prefix)
 {
-	int  rval;
-	specific_ctx_t  ctx;
-	char  buf[1024];
-	FILE  *fp;
+	check_param(EINVAL, is_avro_schema(schema), "schema");
 
-	if (!schema) {
+	int  rval;
+
+	char  real_prefix[1024];
+	snprintf(real_prefix, sizeof(real_prefix),
+		 "%s%s", filename_prefix, avro_schema_type_name(schema));
+
+	avro_specific_gen_t  *ctx =
+	    avro_specific_gen_open(output_path, real_prefix, type_prefix);
+	if (!ctx) {
 		return EINVAL;
 	}
 
-	ctx.type_prefix = type_prefix;
-	ctx.upper_type_prefix = strdup(ctx.type_prefix);
-	strupcase(ctx.upper_type_prefix);
+	check_out(rval, avro_specific_gen_output_schema(ctx, schema));
+	return avro_specific_gen_close(ctx);
 
-	/* Definition file */
-
-	snprintf(buf, sizeof(buf), "%s/%s%s.def",
-		 output_path, filename_prefix,
-		 avro_schema_type_name(schema));
-	fp = fopen(buf, "w");
-	if (!fp) {
-		avro_set_error(strerror(errno));
-		return errno;
-	}
-
-	ctx.writer = avro_writer_file(fp);
-	check_out(rval, write(ctx.writer,
-		  "/* Autogenerated file.  Do not edit! */\n\n"
-		  "#define SCHEMA_DEFINITION() \\\n"));
-	ctx.started_schemas = st_init_numtable();
-	ctx.stack_size = 0;
-	check_out(rval, avro_schema_write_def(&ctx, schema));
-	st_free_table(ctx.started_schemas);
-	check_out(rval, write(ctx.writer, "  /* end of schema definition */\n"));
-	avro_writer_free(ctx.writer);
-
-	/* Header file */
-
-	snprintf(buf, sizeof(buf), "%s/%s%s.h",
-		 output_path, filename_prefix,
-		 avro_schema_type_name(schema));
-	fp = fopen(buf, "w");
-	if (!fp) {
-		avro_set_error(strerror(errno));
-		return errno;
-	}
-
-	ctx.writer = avro_writer_file(fp);
-	check_out(rval, write(ctx.writer,
-		  "/* Autogenerated file.  Do not edit! */\n\n"
-		  "#include \"%s%s.def\"\n"
-		  "#include <avro/specific.h.in>\n"
-		  "#undef SCHEMA_DEFINITION\n",
-		  filename_prefix, avro_schema_type_name(schema)));
-	avro_writer_free(ctx.writer);
-
-	/* Source file */
-
-	snprintf(buf, sizeof(buf), "%s/%s%s.c",
-		 output_path, filename_prefix,
-		 avro_schema_type_name(schema));
-	fp = fopen(buf, "w");
-	if (!fp) {
-		avro_set_error(strerror(errno));
-		return errno;
-	}
-
-	ctx.writer = avro_writer_file(fp);
-	check_out(rval, write(ctx.writer,
-		  "/* Autogenerated file.  Do not edit! */\n\n"
-		  "#include \"%s%s.h\"\n"
-		  "#include \"%s%s.def\"\n"
-		  "#include <avro/specific.c.in>\n"
-		  "#undef SCHEMA_DEFINITION\n",
-		  filename_prefix, avro_schema_type_name(schema),
-		  filename_prefix, avro_schema_type_name(schema)));
-	avro_writer_free(ctx.writer);
-	return 0;
-
-      out:
-	avro_writer_free(ctx.writer);
-	free(ctx.upper_type_prefix);
+error:
+	avro_specific_gen_close(ctx);
 	return rval;
 }

@@ -268,6 +268,12 @@ void avro_raw_string_set_length(avro_raw_string_t *str,
 void avro_raw_string_set(avro_raw_string_t *str, const char *src);
 
 /**
+ * Appends the given C string to an avro_raw_string_t.
+ */
+
+void avro_raw_string_append(avro_raw_string_t *str, const char *src);
+
+/**
  * Gives control of a buffer to an avro_raw_string_t.
  */
 

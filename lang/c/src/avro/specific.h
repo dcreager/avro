@@ -30,6 +30,53 @@ extern "C" {
 #include <avro/data.h>
 
 /*---------------------------------------------------------------------
+ * Generating schema-specific types
+ *
+ * These functions are used within the implementation of avrocc.
+ */
+
+typedef struct avro_specific_gen_t  avro_specific_gen_t;
+
+/**
+ * Creates a new context for generating schema-specific types for a
+ * handful of .avsc files.  This context ensures that we only output the
+ * definitions for a particular schema once, even if it's used in
+ * several .avsc files.
+ *
+ * We will output three files:
+ *
+ *   [output_path]/[filename_prefix].def
+ *   [output_path]/[filename_prefix].h
+ *   [output_path]/[filename_prefix].c
+ *
+ * Each identifier that we define in these files will start with
+ * [type_prefix].
+ */
+
+avro_specific_gen_t *
+avro_specific_gen_open(const char *output_path,
+		       const char *filename_prefix,
+		       const char *type_prefix);
+
+/**
+ * Adds a single schema, along with all of its subschemas to the
+ * schema-specific output files that we're generating.
+ */
+
+int
+avro_specific_gen_output_schema(avro_specific_gen_t *ctx,
+				avro_schema_t schema);
+
+/**
+ * Close all of the schema-specific output files, and free the context
+ * object.
+ */
+
+int
+avro_specific_gen_close(avro_specific_gen_t *ctx);
+
+
+/*---------------------------------------------------------------------
  * “Raw” types
  */
 

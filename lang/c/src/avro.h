@@ -188,6 +188,25 @@ int avro_schema_from_json(const char *jsontext,
 			  avro_schema_t * schema, avro_schema_error_t * error);
 int avro_schema_to_json(const avro_schema_t schema, avro_writer_t out);
 
+/* We're keeping this function in avro.h to avoid a
+ * backwards-incompatible change; the other schema-specific-related
+ * functions can be found in avro/specific.h. */
+
+/**
+ * Generate a schema-specific output file for a single schema.  If you
+ * want to include several schemas in the output, use
+ * avro_specific_gen_open and friends, instead.
+ *
+ * We will output three files:
+ *
+ *   [output_path]/[filename_prefix]_[schema_name].def
+ *   [output_path]/[filename_prefix]_[schema_name].h
+ *   [output_path]/[filename_prefix]_[schema_name].c
+ *
+ * Each identifier that we define in these files will start with
+ * [type_prefix].
+ */
+
 int avro_schema_to_specific(avro_schema_t schema,
 			    const char *output_path,
 			    const char *filename_prefix,

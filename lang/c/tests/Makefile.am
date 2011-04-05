@@ -47,8 +47,8 @@ CLEANFILES += $(nodist_test_specific_SOURCES)
 test_specific_LDADD=$(test_LDADD)
 EXTRA_DIST += list.avsc
 
-specific_list.h specific_list.c specific_list.def: list.avsc ../src/avrocc
-	../src/avrocc -f specific_ -O . -t specific $<
+specific_list.h specific_list.c specific_list.def: list.avsc point.avsc ../src/avrocc
+	../src/avrocc -f specific_list -O . -t specific point.avsc list.avsc
 
 # Skip the valgrind test for now; we'll turn this back on once we commit
 # a fix for AVRO-766.

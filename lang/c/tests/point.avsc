@@ -1,0 +1,8 @@
+{
+  "type": "record",
+  "name": "point",
+  "fields": [
+    { "name": "x", "type": "int" },
+    { "name": "y", "type": "int" }
+  ]
+}

@@ -54,11 +54,13 @@ add_custom_command(
       ${CMAKE_CURRENT_BINARY_DIR}/specific_list.c
     COMMAND
       ${CMAKE_CURRENT_BINARY_DIR}/../src/avrocc
-        -f specific_
+        -f specific_list
         -O ${CMAKE_CURRENT_BINARY_DIR}
         -t specific
+        ${CMAKE_CURRENT_SOURCE_DIR}/point.avsc
         ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
     DEPENDS
+      ${CMAKE_CURRENT_SOURCE_DIR}/point.avsc
       ${CMAKE_CURRENT_SOURCE_DIR}/list.avsc
       ${CMAKE_CURRENT_SOURCE_DIR}/../src/avrocc.c
       ${CMAKE_CURRENT_SOURCE_DIR}/../src/schema_specific.c

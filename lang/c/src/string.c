@@ -88,6 +88,8 @@ avro_raw_string_ensure_buf(avro_raw_string_t *str, size_t length)
 		str->buf = avro_realloc(str->buf, str->allocated_size, new_size);
 		str->allocated_size = new_size;
 	}
+
+	str->our_buf = 1;
 }
 
 
@@ -108,6 +110,20 @@ void avro_raw_string_set(avro_raw_string_t *str, const char *src)
 	avro_raw_string_ensure_buf(str, length+1);
 	memcpy(str->buf, src, length+1);
 	str->size = length+1;
+}
+
+
+void avro_raw_string_append(avro_raw_string_t *str, const char *src)
+{
+	if (str->size == 0) {
+		return avro_raw_string_set(str, src);
+	}
+
+	/* Assume that str->size includes a NUL terminator */
+	size_t  length = strlen(src);
+	avro_raw_string_ensure_buf(str, str->size+length);
+	memcpy(str->buf + str->size - 1, src, length+1);
+	str->size += length;
 }
 
 

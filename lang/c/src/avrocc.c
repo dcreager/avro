@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "avro.h"
+#include "avro/specific.h"
 
 static struct option longopts[] = {
 	{ "output-path", required_argument, NULL, 'O' },
@@ -41,8 +42,9 @@ static void usage(void)
 
 int main(int argc, char **argv)
 {
+	int  rval;
 	char  *output_path = ".";
-	char  *filename = "avro-specific-";
+	char  *filename = "avro-specific";
 	char  *type_prefix = "avro_specific";
 
 	int  ch;
@@ -75,9 +77,16 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	avro_specific_gen_t  *ctx =
+	    avro_specific_gen_open(output_path, filename, type_prefix);
+	if (!ctx) {
+		fprintf(stderr, "Could not open output file:\n  %s\n",
+			avro_strerror());
+		exit(1);
+	}
+
 	int  i;
 	for (i = 0; i < argc; i++) {
-		int  rval;
 		char  *schema_file = argv[i];
 
 		FILE  *fp = fopen(schema_file, "r");
@@ -122,8 +131,7 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		rval = avro_schema_to_specific
-		    (schema, output_path, filename, type_prefix);
+		rval = avro_specific_gen_output_schema(ctx, schema);
 		if (rval) {
 			fprintf(stderr, "Error write schema definition:\n  %s\n",
 				avro_strerror());
@@ -132,6 +140,13 @@ int main(int argc, char **argv)
 		}
 
 		avro_schema_decref(schema);
+	}
+
+	rval = avro_specific_gen_close(ctx);
+	if (rval) {
+		fprintf(stderr, "Cannot close output file:\n  %s\n",
+			avro_strerror());
+		exit(1);
 	}
 	return 0;
 }
