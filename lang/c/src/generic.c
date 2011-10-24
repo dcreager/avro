@@ -56,28 +56,50 @@ avro_generic_value_new(avro_value_iface_t *iface, avro_value_t *dest)
 	int  rval;
 	avro_generic_value_iface_t  *giface =
 	    container_of(iface, avro_generic_value_iface_t, parent);
+
+	/* First see if we can grab something from the free list. */
+	avro_generic_pre_t  *reused;
+	while ((reused = giface->free_list) != NULL) {
+		avro_generic_pre_t  *new_head = reused->next;
+		if (avro_refcount_cas_ptr(&giface->free_list, reused, new_head)) {
+			/* We successfully grabbed the first element of
+			 * the free list. */
+			void  *self = ((void *) reused) + sizeof(avro_generic_pre_t);
+			//printf("%p: Reusing %p (next=%p)\n", iface, reused, giface->free_list);
+			dest->iface = avro_value_iface_incref(iface);
+			dest->self = self;
+			avro_refcount_set(&reused->refcount, 1);
+			reused->next = NULL;
+			return 0;
+		}
+	}
+
+	/* There isn't anything left in the free list, so we have to
+	 * allocate a new instance. */
 	size_t  instance_size = avro_value_instance_size(giface);
-	void  *self = avro_malloc(instance_size + sizeof(volatile int));
-	if (self == NULL) {
+	avro_generic_pre_t  *pre =
+	    avro_malloc(instance_size + sizeof(avro_generic_pre_t));
+	if (pre == NULL) {
 		avro_set_error(strerror(ENOMEM));
 		dest->iface = NULL;
 		dest->self = NULL;
 		return ENOMEM;
 	}
 
-	volatile int  *refcount = (volatile int *) self;
-	self = (char *) self + sizeof(volatile int);
+	self = ((char *) pre) + sizeof(avro_generic_pre_t);
+	//printf("%p: Allocated new %p\n", iface, pre);
 
-	*refcount = 1;
+	avro_refcount_set(&pre->refcount, 1);
+	pre->next = NULL;
 	rval = avro_value_init(giface, self);
 	if (rval != 0) {
-		avro_free(self, instance_size);
+		avro_free(pre, instance_size);
 		dest->iface = NULL;
 		dest->self = NULL;
 		return rval;
 	}
 
-	dest->iface = avro_value_iface_incref(&giface->parent);
+	dest->iface = avro_value_iface_incref(iface);
 	dest->self = self;
 	return 0;
 }
@@ -86,13 +108,44 @@ static void
 avro_generic_value_free(const avro_value_iface_t *iface, void *self)
 {
 	if (self != NULL) {
-		const avro_generic_value_iface_t  *giface =
+		avro_value_t  vself = { (avro_value_iface_t *) iface, self };
+		avro_value_reset(&vself);
+
+		/* Instead of actually freeing the instance, return it
+		 * to the free list. */
+		avro_generic_value_iface_t  *giface =
 		    container_of(iface, avro_generic_value_iface_t, parent);
-		size_t  instance_size = avro_value_instance_size(giface);
-		avro_value_done(giface, self);
-		self = (char *) self - sizeof(volatile int);
-		avro_free(self, instance_size + sizeof(volatile int));
+		avro_generic_pre_t  *pre =
+		    (self - sizeof(avro_generic_pre_t));
+
+		avro_generic_pre_t  *head;
+		do {
+			head = giface->free_list;
+			pre->next = head;
+		} while (!avro_refcount_cas_ptr(&giface->free_list, head, pre));
+		//printf("%p: Added %p to free list (next=%p)\n", iface, giface->free_list, pre->next);
 	}
+}
+
+static void
+avro_generic_value_free_free_list(avro_value_iface_t *iface)
+{
+	avro_generic_value_iface_t  *giface =
+	    container_of(iface, avro_generic_value_iface_t, parent);
+	size_t  instance_size =
+		avro_value_instance_size(giface) + sizeof(avro_generic_pre_t);
+
+	avro_generic_pre_t  *pre = giface->free_list;
+	while (pre != NULL) {
+		avro_generic_pre_t  *next = pre->next;
+		void  *self = ((void *) pre) + sizeof(avro_generic_pre_t);
+		//printf("%p: Freeing %p\n", iface, pre);
+		//printf("%p:   %p\n", iface, pre->next);
+		avro_value_done(giface, self);
+		avro_free(pre, instance_size);
+		pre = next;
+	}
+	giface->free_list = NULL;
 }
 
 static void
@@ -102,8 +155,9 @@ avro_generic_value_incref(avro_value_t *value)
 	 * This only works if you pass in the top-level value.
 	 */
 
-	volatile int  *refcount = (volatile int *) ((char *) value->self - sizeof(volatile int));
-	avro_refcount_inc(refcount);
+	avro_generic_pre_t  *pre =
+	    ((char *) value->self - sizeof(avro_generic_pre_t));
+	avro_refcount_inc(&pre->refcount);
 }
 
 static void
@@ -113,8 +167,9 @@ avro_generic_value_decref(avro_value_t *value)
 	 * This only works if you pass in the top-level value.
 	 */
 
-	volatile int  *refcount = (volatile int *) ((char *) value->self - sizeof(volatile int));
-	if (avro_refcount_dec(refcount)) {
+	avro_generic_pre_t  *pre =
+	    ((char *) value->self - sizeof(avro_generic_pre_t));
+	if (avro_refcount_dec(&pre->refcount)) {
 		avro_generic_value_free(value->iface, value->self);
 	}
 }
@@ -184,6 +239,7 @@ avro_generic_link_decref_iface(avro_value_iface_t *viface)
 		/* We don't keep a reference to the target
 		 * implementation, since that would give us a reference
 		 * cycle. */
+		avro_generic_value_free_free_list(viface);
 		avro_freet(avro_generic_link_value_iface_t, iface);
 	}
 }
@@ -632,6 +688,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_LINK_CLASS =
 		avro_generic_link_add,
 		avro_generic_link_set_branch
 	},
+	NULL,
 	avro_generic_link_instance_size,
 	avro_generic_link_init,
 	avro_generic_link_done
@@ -774,6 +831,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_BOOLEAN_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_boolean_instance_size,
 	avro_generic_boolean_init,
 	avro_generic_boolean_done
@@ -943,6 +1001,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_BYTES_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_bytes_instance_size,
 	avro_generic_bytes_init,
 	avro_generic_bytes_done
@@ -1077,6 +1136,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_DOUBLE_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_double_instance_size,
 	avro_generic_double_init,
 	avro_generic_double_done
@@ -1211,6 +1271,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FLOAT_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_float_instance_size,
 	avro_generic_float_init,
 	avro_generic_float_done
@@ -1345,6 +1406,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_INT_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_int_instance_size,
 	avro_generic_int_init,
 	avro_generic_int_done
@@ -1479,6 +1541,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_LONG_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_long_instance_size,
 	avro_generic_long_init,
 	avro_generic_long_done
@@ -1609,6 +1672,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_NULL_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_null_instance_size,
 	avro_generic_null_init,
 	avro_generic_null_done
@@ -1674,7 +1738,9 @@ avro_generic_string_get(const avro_value_iface_t *iface,
 	if (size != NULL) {
 		/* raw_string's length includes the NUL terminator,
 		 * unless it's empty */
-		*size = (contents == NULL)? 1: avro_raw_string_length(self);
+		size_t  claimed_size = avro_raw_string_length(self);
+		*size =
+		    (contents == NULL || claimed_size == 0)? 1: claimed_size;
 	}
 	return 0;
 }
@@ -1808,6 +1874,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_STRING_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_string_instance_size,
 	avro_generic_string_init,
 	avro_generic_string_done
@@ -1873,6 +1940,7 @@ avro_generic_array_decref_iface(avro_value_iface_t *viface)
 	avro_generic_array_value_iface_t  *iface =
 	    container_of(viface, avro_generic_array_value_iface_t, parent);
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
 		avro_schema_decref(iface->schema);
 		avro_value_iface_decref(&iface->child_giface->parent);
 		avro_freet(avro_generic_array_value_iface_t, iface);
@@ -2062,6 +2130,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_ARRAY_CLASS =
 	NULL, /* add */
 	NULL  /* set_branch */
 },
+	NULL,
 	avro_generic_array_instance_size,
 	avro_generic_array_init,
 	avro_generic_array_done
@@ -2130,6 +2199,7 @@ avro_generic_enum_decref_iface(avro_value_iface_t *viface)
 	avro_generic_enum_value_iface_t  *iface =
 	    (avro_generic_enum_value_iface_t *) viface;
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
 		avro_schema_decref(iface->schema);
 		avro_freet(avro_generic_enum_value_iface_t, iface);
 	}
@@ -2247,6 +2317,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_ENUM_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_enum_instance_size,
 	avro_generic_enum_init,
 	avro_generic_enum_done
@@ -2295,6 +2366,7 @@ avro_generic_fixed_decref_iface(avro_value_iface_t *viface)
 	avro_generic_fixed_value_iface_t  *iface =
 	    container_of(viface, avro_generic_fixed_value_iface_t, parent);
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
 		avro_schema_decref(iface->schema);
 		avro_freet(avro_generic_fixed_value_iface_t, iface);
 	}
@@ -2442,6 +2514,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FIXED_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_fixed_instance_size,
 	avro_generic_fixed_init,
 	avro_generic_fixed_done
@@ -2500,6 +2573,7 @@ avro_generic_map_decref_iface(avro_value_iface_t *viface)
 	avro_generic_map_value_iface_t  *iface =
 	    container_of(viface, avro_generic_map_value_iface_t, parent);
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
 		avro_schema_decref(iface->schema);
 		avro_value_iface_decref(&iface->child_giface->parent);
 		avro_freet(avro_generic_map_value_iface_t, iface);
@@ -2696,6 +2770,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_MAP_CLASS =
 		avro_generic_map_add,
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_map_instance_size,
 	avro_generic_map_init,
 	avro_generic_map_done
@@ -2803,6 +2878,8 @@ avro_generic_record_decref_iface(avro_value_iface_t *viface)
 	    container_of(viface, avro_generic_record_value_iface_t, parent);
 
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
+
 		size_t  i;
 		for (i = 0; i < iface->field_count; i++) {
 			avro_value_iface_decref(&iface->field_ifaces[i]->parent);
@@ -3009,6 +3086,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_RECORD_CLASS =
 		NULL, /* add */
 		NULL  /* set_branch */
 	},
+	NULL,
 	avro_generic_record_instance_size,
 	avro_generic_record_init,
 	avro_generic_record_done
@@ -3181,6 +3259,8 @@ avro_generic_union_decref_iface(avro_value_iface_t *viface)
 	    container_of(viface, avro_generic_union_value_iface_t, parent);
 
 	if (avro_refcount_dec(&iface->refcount)) {
+		avro_generic_value_free_free_list(viface);
+
 		size_t  i;
 		for (i = 0; i < iface->branch_count; i++) {
 			avro_value_iface_decref(&iface->branch_ifaces[i]->parent);
@@ -3415,6 +3495,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_UNION_CLASS =
 		NULL, /* add */
 		avro_generic_union_set_branch
 	},
+	NULL,
 	avro_generic_union_instance_size,
 	avro_generic_union_init,
 	avro_generic_union_done

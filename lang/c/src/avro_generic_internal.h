@@ -28,6 +28,11 @@ extern "C" {
 #include "avro/schema.h"
 #include "avro/value.h"
 
+typedef struct avro_generic_pre {
+	struct avro_generic_pre  *next;
+	volatile int  refcount;
+} avro_generic_pre_t;
+
 /*
  * Each generic value implementation struct defines a couple of extra
  * methods that we use to control the lifecycle of the value objects.
@@ -35,6 +40,13 @@ extern "C" {
 
 typedef struct avro_generic_value_iface {
 	avro_value_iface_t  parent;
+
+	/**
+	 * We maintain a list of any instances of this schema class that
+	 * we've created, and then freed.  This lets us allocate later
+	 * instances more quickly, especially if they're very nested.
+	 */
+	void * volatile  free_list;
 
 	/**
 	 * Return the size of an instance of this value type.  If this

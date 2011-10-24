@@ -53,6 +53,13 @@ avro_refcount_inc(volatile int *refcount);
 static inline int
 avro_refcount_dec(volatile int *refcount);
 
+/**
+ * Compare-and-swap on a pointer.  Returns 1 if the CAS succeeds.
+ */
+
+static inline int
+avro_refcount_cas_ptr(void * volatile *ptr, void *oval, void *nval);
+
 
 /*-----------------------------------------------------------------------
  * Non-Atomic Reference Count
@@ -80,6 +87,13 @@ avro_refcount_dec(volatile int *refcount)
 		return (*refcount == 0);
 	}
 	return 0;
+}
+
+static inline int
+avro_refcount_cas_ptr(void * volatile *ptr, void *oval, void *nval)
+{
+    *ptr = nval;
+    return 1;
 }
 
 /*-----------------------------------------------------------------------
@@ -113,6 +127,12 @@ avro_refcount_dec(volatile int *refcount)
 	return 0;
 }
 
+static inline int
+avro_refcount_cas_ptr(void * volatile *ptr, void *oval, void *nval)
+{
+	return OSAtomicCompareAndSwapPtr(oval, nval, ptr);
+}
+
 
 /*-----------------------------------------------------------------------
  * GCC intrinsics
@@ -141,6 +161,12 @@ avro_refcount_dec(volatile int *refcount)
 		return (__sync_sub_and_fetch(refcount, 1) == 0);
 	}
 	return 0;
+}
+
+static inline int
+avro_refcount_cas_ptr(void * volatile *ptr, void *oval, void *nval)
+{
+	return (__sync_val_compare_and_swap(ptr, oval, nval) == oval);
 }
 
 
@@ -189,6 +215,16 @@ avro_refcount_dec(volatile int *refcount)
 		return result;
 	}
 	return 0;
+}
+
+static inline int
+avro_refcount_cas_ptr(void * volatile *ptr, void *oval, void *nval)
+{
+    void *prev;
+    __asm__ __volatile__ ("lock ; cmpxchg %3,%4"
+                          : "=a" (prev), "=m" (ptr)
+                          : "0" (oval), "q" (nval), "m" (ptr));
+    return prev == oval;
 }
 
 #undef REFCOUNT_SS
@@ -258,6 +294,58 @@ avro_refcount_dec(volatile int *refcount)
 	return prev == 1;
 }
 
+/* determine the size of void * */
+
+#include <limits.h>
+#include <stdint.h>
+#if INTPTR_MAX == INT32_MAX
+#define REFCOUNT_SS "w"
+#elif INTPTR_MAX == INT64_MAX
+#define REFCOUNT_SS "d"
+#else
+#error "Unknown void * size"
+#endif
+
+static inline int
+avro_refcount_LL_int(void * volatile *ptr)
+{
+    void *val;
+    __asm__ __volatile__ ("l"REFCOUNT_SS"arx %[val],0,%[ptr]"
+                          : [val] "=r" (val)
+                          : [ptr] "r" (ptr)
+                          : "cc");
+
+    return val;
+}
+
+/* Returns non-zero if the store was successful, zero otherwise. */
+static inline int
+avro_refcount_SC_ptr(void * volatile *ptr, void *val)
+{
+    int ret = 1; /* init to non-zero, will be reset to 0 if SC was successful */
+    __asm__ __volatile__ ("st"REFCOUNT_SS"cx. %[val],0,%[ptr];\n"
+                          "beq 1f;\n"
+                          "li %[ret], 0;\n"
+                          "1: ;\n"
+                          : [ret] "=r" (ret)
+                          : [ptr] "r" (ptr), [val] "r" (val), "0" (ret)
+                          : "cc", "memory");
+    return ret;
+}
+
+static inline int
+avro_refcount_cas_ptr(void * volatile ptr, void *oval, void *nval)
+{
+    void  *prev;
+    do {
+        prev = OPA_LL_ptr(&ptr);
+    } while (prev == oval && !OPA_SC_ptr(&ptr, nval));
+    return prev == oval;
+}
+
+#undef REFCOUNT_SS
+
+
 
 /*-----------------------------------------------------------------------
  * Windows intrinsics
@@ -293,6 +381,26 @@ avro_refcount_dec(volatile int *refcount)
 	}
 	return 0;
 }
+
+static _opa_inline void *OPA_cas_ptr(OPA_ptr_t *ptr, void *oldv, void *newv)
+{
+#if INTPTR_MAX == INT32_MAX
+	return ((void *)(LONG_PTR) _InterlockedCompareExchange
+	    ((LONG volatile *)&(ptr->v),
+	     (LONG)(LONG_PTR)newv,
+	     (LONG)(LONG_PTR)oldv)
+	    );
+#elif INTPTR_MAX == INT64_MAX
+	return ((void *)(LONG_PTR)_InterlockedCompareExchange64
+	    ((INT64 volatile *)&(ptr->v),
+	     (INT64)(LONG_PTR)newv,
+	     (INT64)(LONG_PTR)oldv)
+	    );
+#else
+#error "Unknown void * size"
+#endif
+}
+
 
 /*-----------------------------------------------------------------------
  * Fallback

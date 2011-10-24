@@ -302,7 +302,7 @@ _check_write_read(avro_value_t *val)
 		return EXIT_FAILURE;
 	}
 
-	avro_writer_dump(writer, stderr);
+	//avro_writer_dump(writer, stderr);
 
 	size_t size;
 	if (avro_value_sizeof(val, &size)) {
