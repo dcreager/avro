@@ -663,15 +663,6 @@ avro_generic_link_class(avro_schema_t schema)
  * boolean
  */
 
-static int
-avro_generic_boolean_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	int  *self = (int *) vself;
-	*self = 0;
-	return 0;
-}
-
 static avro_type_t
 avro_generic_boolean_get_type(const avro_value_iface_t *iface, const void *vself)
 {
@@ -740,7 +731,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_BOOLEAN_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_boolean_reset,
+		NULL, /* reset */
 		avro_generic_boolean_get_type,
 		avro_generic_boolean_get_schema,
 		/* primitive getters */
@@ -975,15 +966,6 @@ avro_generic_bytes_new(avro_value_t *value, void *buf, size_t size)
  * double
  */
 
-static int
-avro_generic_double_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	double  *self = (double *) vself;
-	*self = 0.0;
-	return 0;
-}
-
 static avro_type_t
 avro_generic_double_get_type(const avro_value_iface_t *iface, const void *vself)
 {
@@ -1052,7 +1034,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_DOUBLE_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_double_reset,
+		NULL, /* reset */
 		avro_generic_double_get_type,
 		avro_generic_double_get_schema,
 		/* primitive getters */
@@ -1117,15 +1099,6 @@ avro_generic_double_new(avro_value_t *value, double val)
 /*-----------------------------------------------------------------------
  * float
  */
-
-static int
-avro_generic_float_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	float  *self = (float *) vself;
-	*self = 0.0f;
-	return 0;
-}
 
 static avro_type_t
 avro_generic_float_get_type(const avro_value_iface_t *iface, const void *vself)
@@ -1195,7 +1168,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FLOAT_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_float_reset,
+		NULL, /* reset */
 		avro_generic_float_get_type,
 		avro_generic_float_get_schema,
 		/* primitive getters */
@@ -1260,15 +1233,6 @@ avro_generic_float_new(avro_value_t *value, float val)
 /*-----------------------------------------------------------------------
  * int
  */
-
-static int
-avro_generic_int_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	int32_t  *self = (int32_t *) vself;
-	*self = 0;
-	return 0;
-}
 
 static avro_type_t
 avro_generic_int_get_type(const avro_value_iface_t *iface, const void *vself)
@@ -1338,7 +1302,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_INT_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_int_reset,
+		NULL, /* reset */
 		avro_generic_int_get_type,
 		avro_generic_int_get_schema,
 		/* primitive getters */
@@ -1403,15 +1367,6 @@ avro_generic_int_new(avro_value_t *value, int32_t val)
 /*-----------------------------------------------------------------------
  * long
  */
-
-static int
-avro_generic_long_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	int64_t  *self = (int64_t *) vself;
-	*self = 0;
-	return 0;
-}
 
 static avro_type_t
 avro_generic_long_get_type(const avro_value_iface_t *iface, const void *vself)
@@ -1481,7 +1436,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_LONG_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_long_reset,
+		NULL, /* reset */
 		avro_generic_long_get_type,
 		avro_generic_long_get_schema,
 		/* primitive getters */
@@ -1547,15 +1502,6 @@ avro_generic_long_new(avro_value_t *value, int64_t val)
  * null
  */
 
-static int
-avro_generic_null_reset(const avro_value_iface_t *iface, void *vself)
-{
-	AVRO_UNUSED(iface);
-	int  *self = (int *) vself;
-	*self = 0;
-	return 0;
-}
-
 static avro_type_t
 avro_generic_null_get_type(const avro_value_iface_t *iface, const void *vself)
 {
@@ -1620,7 +1566,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_NULL_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_null_reset,
+		NULL, /* reset */
 		avro_generic_null_get_type,
 		avro_generic_null_get_schema,
 		/* primitive getters */
@@ -1907,6 +1853,7 @@ typedef struct avro_generic_array_value_iface {
 } avro_generic_array_value_iface_t;
 
 typedef struct avro_generic_array {
+	size_t  allocated_elements;
 	avro_raw_array_t  array;
 } avro_generic_array_t;
 
@@ -1938,7 +1885,7 @@ avro_generic_array_free_elements(const avro_generic_value_iface_t *child_giface,
 				 avro_generic_array_t *self)
 {
 	size_t  i;
-	for (i = 0; i < avro_raw_array_size(&self->array); i++) {
+	for (i = 0; i < self->allocated_elements; i++) {
 		void  *child_self = avro_raw_array_get_raw(&self->array, i);
 		avro_value_done(child_giface, child_self);
 	}
@@ -1947,10 +1894,8 @@ avro_generic_array_free_elements(const avro_generic_value_iface_t *child_giface,
 static int
 avro_generic_array_reset(const avro_value_iface_t *viface, void *vself)
 {
-	const avro_generic_array_value_iface_t  *iface =
-	    container_of(viface, avro_generic_array_value_iface_t, parent);
-	avro_generic_array_t  *self = (avro_generic_array_t *) vself;
-	avro_generic_array_free_elements(iface->child_giface, self);
+	AVRO_UNUSED(viface);
+	avro_generic_array_t  *self = vself;
 	avro_raw_array_clear(&self->array);
 	return 0;
 }
@@ -2005,21 +1950,32 @@ avro_generic_array_get_by_index(const avro_value_iface_t *viface,
 static int
 avro_generic_array_append(const avro_value_iface_t *viface,
 			  void *vself, avro_value_t *child,
-			  size_t *new_index)
+			  size_t *new_index_out)
 {
 	int  rval;
+	size_t  new_size;
 	const avro_generic_array_value_iface_t  *iface =
 	    container_of(viface, avro_generic_array_value_iface_t, parent);
-	avro_generic_array_t  *self = (avro_generic_array_t *) vself;
+
+	avro_generic_array_t  *self = vself;
 	child->iface = &iface->child_giface->parent;
 	child->self = avro_raw_array_append(&self->array);
 	if (child->self == NULL) {
 		avro_set_error("Couldn't expand array");
 		return ENOMEM;
 	}
-	check(rval, avro_value_init(iface->child_giface, child->self));
-	if (new_index != NULL) {
-		*new_index = avro_raw_array_size(&self->array) - 1;
+
+	new_size = avro_raw_array_size(&self->array);
+	if (new_size > self->allocated_elements) {
+		/* This is a brand-new, freshly allocated element */
+		check(rval, avro_value_init(iface->child_giface, child->self));
+		self->allocated_elements++;
+	} else {
+		/* This is a reused element */
+		check(rval, avro_value_reset(child));
+	}
+	if (new_index_out != NULL) {
+		*new_index_out = new_size - 1;
 	}
 	return 0;
 }
@@ -2040,6 +1996,7 @@ avro_generic_array_init(const avro_value_iface_t *viface, void *vself)
 
 	size_t  child_size = avro_value_instance_size(iface->child_giface);
 	avro_raw_array_init(&self->array, child_size);
+	self->allocated_elements = 0;
 	return 0;
 }
 
@@ -2178,15 +2135,6 @@ avro_generic_enum_decref_iface(avro_value_iface_t *viface)
 	}
 }
 
-static int
-avro_generic_enum_reset(const avro_value_iface_t *viface, void *vself)
-{
-	AVRO_UNUSED(viface);
-	int  *self = (int *) vself;
-	*self = 0;
-	return 0;
-}
-
 static avro_type_t
 avro_generic_enum_get_type(const avro_value_iface_t *iface, const void *vself)
 {
@@ -2256,7 +2204,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_ENUM_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_enum_reset,
+		NULL, /* reset */
 		avro_generic_enum_get_type,
 		avro_generic_enum_get_schema,
 		/* primitive getters */
@@ -2350,15 +2298,6 @@ avro_generic_fixed_decref_iface(avro_value_iface_t *viface)
 		avro_schema_decref(iface->schema);
 		avro_freet(avro_generic_fixed_value_iface_t, iface);
 	}
-}
-
-static int
-avro_generic_fixed_reset(const avro_value_iface_t *viface, void *vself)
-{
-	const avro_generic_fixed_value_iface_t  *iface =
-	    container_of(viface, avro_generic_fixed_value_iface_t, parent);
-	memset(vself, 0, iface->data_size);
-	return 0;
 }
 
 static avro_type_t
@@ -2460,7 +2399,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FIXED_CLASS =
 		/* general "instance" methods */
 		avro_generic_value_incref,
 		avro_generic_value_decref,
-		avro_generic_fixed_reset,
+		NULL, /* reset */
 		avro_generic_fixed_get_type,
 		avro_generic_fixed_get_schema,
 		/* primitive getters */
@@ -3201,6 +3140,9 @@ typedef struct avro_generic_union_value_iface {
 	 * this from schema, but this is easier. */
 	size_t  branch_count;
 
+	/** The offset of each branch within the union struct. */
+	size_t  *branch_offsets;
+
 	/** The value implementation for each branch. */
 	avro_generic_value_iface_t  **branch_ifaces;
 } avro_generic_union_value_iface_t;
@@ -3210,20 +3152,17 @@ typedef struct avro_generic_union {
 	 * is selected. */
 	int  discriminant;
 
+	/** Which branches have been initialized */
+	unsigned char  *branch_initialized;
+
 	/* The rest of the struct is taken up by the inline storage
-	 * needed for the active branch. */
+	 * needed for the various branches. */
 } avro_generic_union_t;
 
 
-/** Return the child interface for the active branch. */
-#define avro_generic_union_branch_giface(iface, _union) \
-	((iface)->branch_ifaces[(_union)->discriminant])
-#define avro_generic_union_branch_iface(iface, _union) \
-	(&(avro_generic_union_branch_giface((iface), (_union)))->parent)
-
 /** Return a pointer to the active branch within a union struct. */
-#define avro_generic_union_branch(_union) \
-	(((char *) (_union)) + sizeof(avro_generic_union_t))
+#define avro_generic_union_branch(iface, _union, index) \
+	(((void *) (_union)) + (iface)->branch_offsets[(index)])
 
 
 static avro_value_iface_t *
@@ -3248,6 +3187,8 @@ avro_generic_union_decref_iface(avro_value_iface_t *viface)
 		}
 
 		avro_schema_decref(iface->schema);
+		avro_free(iface->branch_offsets,
+			  sizeof(size_t) * iface->branch_count);
 		avro_free(iface->branch_ifaces,
 			  sizeof(avro_generic_value_iface_t *) * iface->branch_count);
 
@@ -3261,19 +3202,23 @@ avro_generic_union_reset(const avro_value_iface_t *viface, void *vself)
 {
 	const avro_generic_union_value_iface_t  *iface =
 	    container_of(viface, avro_generic_union_value_iface_t, parent);
-	avro_generic_union_t  *self = (avro_generic_union_t *) vself;
-	/* Keep the same branch selected, for the common case that we're
-	 * about to reuse it. */
-	if (self->discriminant >= 0) {
+	int  rval;
+	avro_generic_union_t  *self = vself;
+
+	/* Keep all of the branches around, for the common case that
+	 * we're about to reuse them. */
+	size_t  i;
+	for (i = 0; i < iface->branch_count; i++) {
+		if (self->branch_initialized[i]) {
 #if DEBUG_BRANCHES
-		fprintf(stderr, "Resetting branch %d\n",
-			self->discriminant);
+			fprintf(stderr, "Resetting branch %" PRIsz "\n", i);
 #endif
-		avro_value_t  value = {
-			avro_generic_union_branch_iface(iface, self),
-			avro_generic_union_branch(self)
-		};
-		return avro_value_reset(&value);
+			avro_value_t  value = {
+				&iface->branch_ifaces[i]->parent,
+				avro_generic_union_branch(iface, self, i)
+			};
+			check(rval, avro_value_reset(&value));
+		}
 	}
 	return 0;
 }
@@ -3316,8 +3261,8 @@ avro_generic_union_get_current_branch(const avro_value_iface_t *viface,
 		avro_set_error("Union has no selected branch");
 		return EINVAL;
 	}
-	branch->iface = avro_generic_union_branch_iface(iface, self);
-	branch->self = avro_generic_union_branch(self);
+	branch->iface = &iface->branch_ifaces[self->discriminant]->parent;
+	branch->self = avro_generic_union_branch(iface, self, self->discriminant);
 	return 0;
 }
 
@@ -3335,37 +3280,37 @@ avro_generic_union_set_branch(const avro_value_iface_t *viface,
 	fprintf(stderr, "Selecting branch %d (was %d)\n",
 		discriminant, self->discriminant);
 #endif
+	self->discriminant = discriminant;
 
 	/*
-	 * If the new desired branch is different than the currently
-	 * active one, then finalize the old branch and initialize the
-	 * new one.
+	 * If the caller selected "no branch", then we don't need to
+	 * initialize anything.
 	 */
-	if (self->discriminant != discriminant) {
-		if (self->discriminant >= 0) {
-#if DEBUG_BRANCHES
-			fprintf(stderr, "Finalizing branch %d\n",
-				self->discriminant);
-#endif
-			avro_value_done
-			    (avro_generic_union_branch_giface(iface, self),
-			     avro_generic_union_branch(self));
+	if (discriminant < 0) {
+		if (branch != NULL) {
+			branch->iface = NULL;
+			branch->self = NULL;
 		}
-		self->discriminant = discriminant;
-		if (discriminant >= 0) {
+		return 0;
+	}
+
+	/*
+	 * If the new desired branch hasn't been initialized yet, then
+	 * initialize it.
+	 */
+	if (!self->branch_initialized[discriminant]) {
 #if DEBUG_BRANCHES
-			fprintf(stderr, "Initializing branch %d\n",
-				self->discriminant);
+		fprintf(stderr, "Initializing branch %d\n", discriminant);
 #endif
-			check(rval, avro_value_init
-			      (avro_generic_union_branch_giface(iface, self),
-			       avro_generic_union_branch(self)));
-		}
+		check(rval, avro_value_init
+		      (iface->branch_ifaces[discriminant],
+		       avro_generic_union_branch(iface, self, discriminant)));
+		self->branch_initialized[discriminant] = 1;
 	}
 
 	if (branch != NULL) {
-		branch->iface = avro_generic_union_branch_iface(iface, self);
-		branch->self = avro_generic_union_branch(self);
+		branch->iface = &iface->branch_ifaces[discriminant]->parent;
+		branch->self = avro_generic_union_branch(iface, self, discriminant);
 	}
 
 	return 0;
@@ -3382,9 +3327,16 @@ avro_generic_union_instance_size(const avro_value_iface_t *viface)
 static int
 avro_generic_union_init(const avro_value_iface_t *viface, void *vself)
 {
-	AVRO_UNUSED(viface);
-	avro_generic_union_t  *self = (avro_generic_union_t *) vself;
+	const avro_generic_union_value_iface_t  *iface =
+	    container_of(viface, avro_generic_union_value_iface_t, parent);
+	avro_generic_union_t  *self = vself;
 	self->discriminant = -1;
+	size_t  bi_size = sizeof(unsigned char) * iface->branch_count;
+	self->branch_initialized = avro_malloc(bi_size);
+	if (self->branch_initialized == NULL) {
+		return -1;
+	}
+	memset(self->branch_initialized, 0, bi_size);
 	return 0;
 }
 
@@ -3393,17 +3345,22 @@ avro_generic_union_done(const avro_value_iface_t *viface, void *vself)
 {
 	const avro_generic_union_value_iface_t  *iface =
 	    container_of(viface, avro_generic_union_value_iface_t, parent);
-	avro_generic_union_t  *self = (avro_generic_union_t *) vself;
-	if (self->discriminant >= 0) {
+	avro_generic_union_t  *self = vself;
+
+	size_t  i;
+	for (i = 0; i < iface->branch_count; i++) {
+		if (self->branch_initialized[i]) {
 #if DEBUG_BRANCHES
-		fprintf(stderr, "Finalizing branch %d\n",
-			self->discriminant);
+			fprintf(stderr, "Finalizing branch %" PRIsz "\n", i);
 #endif
-		avro_value_done
-		    (avro_generic_union_branch_giface(iface, self),
-		     avro_generic_union_branch(self));
-		self->discriminant = -1;
+			avro_value_done
+			    (iface->branch_ifaces[i],
+			     avro_generic_union_branch(iface, self, i));
+		}
 	}
+
+	avro_free(self->branch_initialized,
+		  sizeof(unsigned char) * iface->branch_count);
 }
 
 static avro_generic_value_iface_t  AVRO_GENERIC_UNION_CLASS =
@@ -3478,19 +3435,28 @@ avro_generic_union_class(avro_schema_t schema, memoize_state_t *state)
 	iface->schema = avro_schema_incref(schema);
 
 	iface->branch_count = avro_schema_union_size(schema);
+	size_t  branch_offsets_size =
+		sizeof(size_t) * iface->branch_count;
 	size_t  branch_ifaces_size =
 		sizeof(avro_generic_value_iface_t *) * iface->branch_count;
 
-	iface->branch_ifaces = (avro_generic_value_iface_t **) avro_malloc(branch_ifaces_size);
+	iface->branch_offsets = avro_malloc(branch_offsets_size);
+	if (iface->branch_offsets == NULL) {
+		goto error;
+	}
+
+	iface->branch_ifaces = avro_malloc(branch_ifaces_size);
 	if (iface->branch_ifaces == NULL) {
 		goto error;
 	}
 
-	size_t  max_branch_size = 0;
+	size_t  next_offset = sizeof(avro_generic_union_t);
 	size_t  i;
 	for (i = 0; i < iface->branch_count; i++) {
 		avro_schema_t  branch_schema =
 		    avro_schema_union_branch(schema, i);
+
+		iface->branch_offsets[i] = next_offset;
 
 		iface->branch_ifaces[i] =
 		    avro_generic_class_from_schema_memoized(branch_schema, state);
@@ -3509,22 +3475,21 @@ avro_generic_union_class(avro_schema_t schema, memoize_state_t *state)
 		fprintf(stderr, "Branch %" PRIsz ", size %" PRIsz "\n",
 			i, branch_size);
 #endif
-
-		if (branch_size > max_branch_size) {
-			max_branch_size = branch_size;
-		}
+		next_offset += branch_size;
 	}
 
-	iface->instance_size =
-		sizeof(avro_generic_union_t) + max_branch_size;
+	iface->instance_size = next_offset;
 #if DEBUG_BRANCHES
-	fprintf(stderr, "MAX BRANCH SIZE: %" PRIsz "\n", max_branch_size);
+	fprintf(stderr, "UNION SIZE: %" PRIsz "\n", next_offset);
 #endif
 
 	return &iface->parent;
 
 error:
 	avro_schema_decref(iface->schema);
+	if (iface->branch_offsets != NULL) {
+		avro_free(iface->branch_offsets, branch_offsets_size);
+	}
 	if (iface->branch_ifaces != NULL) {
 		for (i = 0; i < iface->branch_count; i++) {
 			if (iface->branch_ifaces[i] != NULL) {

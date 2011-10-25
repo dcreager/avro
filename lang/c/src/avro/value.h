@@ -414,7 +414,7 @@ avro_value_to_json(const avro_value_t *value,
     ((cls)->decref_iface == NULL? (void) 0: (cls)->decref_iface((cls)))
 
 #define avro_value_reset(value) \
-    avro_value_call0(value, reset, EINVAL)
+    avro_value_call0(value, reset, 0)
 #define avro_value_get_type(value) \
     avro_value_call0(value, get_type, (avro_type_t) -1)
 #define avro_value_get_schema(value) \

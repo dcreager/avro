@@ -1312,16 +1312,6 @@ test_record(void)
 	try(avro_value_reset(&val),
 	    "Cannot reset record");
 
-	int  bval;
-	try(avro_value_get_by_index(&val, 0, &field, NULL),
-	    "Cannot get field 0");
-	try(avro_value_get_boolean(&field, &bval),
-	    "Cannot get field 0 value");
-	if (bval) {
-		fprintf(stderr, "Unexpected value for field 0\n");
-		return EXIT_FAILURE;
-	}
-
 	size_t  count;
 	try(avro_value_get_by_index(&val, 3, &field, NULL),
 	    "Cannot get field 3");
