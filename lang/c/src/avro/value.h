@@ -240,23 +240,48 @@ struct avro_value_iface {
 	 */
 
 	/*
-	 * For all of these, the value class should know which class to
-	 * use for its children.
+	 * For the foo_existing methods (as well as set_by_index and
+	 * set_by_name), the value class will take control of your
+	 * reference to the child value.  For the non-existing versions,
+	 * the value class will manage the storage for the children
+	 * itself, and will allocate and return an element value for the
+	 * caller to fill in.
 	 */
 
 	/* Creates a new array element. */
 	int (*append)(const avro_value_iface_t *iface,
 		      void *self, avro_value_t *child_out, size_t *new_index);
 
+	int (*append_existing)(const avro_value_iface_t *iface,
+			       void *self, avro_value_t *child, size_t *new_index);
+
 	/* Creates a new map element, or returns an existing one. */
 	int (*add)(const avro_value_iface_t *iface,
 		   void *self, const char *key,
 		   avro_value_t *child, size_t *index, int *is_new);
 
+	int (*add_existing)(const avro_value_iface_t *iface,
+			    void *self, const char *key,
+			    avro_value_t *child, size_t *index, int *is_new);
+
+	/* Sets a record, map or array element by index. */
+	int (*set_by_index)(const avro_value_iface_t *iface,
+			    void *self, size_t index,
+			    avro_value_t *child, const char **name);
+
+	/* Sets a record or map element by name. */
+	int (*set_by_name)(const avro_value_iface_t *iface,
+			   void *self, const char *name,
+			   avro_value_t *child, size_t *index);
+
 	/* Select a union branch. */
 	int (*set_branch)(const avro_value_iface_t *iface,
 			  void *self, int discriminant,
 			  avro_value_t *branch);
+
+	int (*set_branch_existing)(const avro_value_iface_t *iface,
+				   void *self, int discriminant,
+				   avro_value_t *branch);
 };
 
 
@@ -392,6 +417,39 @@ avro_value_to_json(const avro_value_t *value,
 		   int one_line, char **json_str);
 
 
+/*
+ * Default implementations of the foo_existing compound setter methods.
+ * They work by calling the non-existing version of the setter, which
+ * allows the value implementation to allocate its own storage for the
+ * element; we then use copy_from to copy the existing element into the
+ * value's managed copy.
+ */
+int
+avro_value_default_append_existing(const avro_value_iface_t *iface,
+				   void *self, avro_value_t *child,
+				   size_t *new_index);
+
+int
+avro_value_default_add_existing(const avro_value_iface_t *iface,
+				void *self, const char *key,
+				avro_value_t *child, size_t *index, int *is_new);
+
+int
+avro_value_default_set_by_index(const avro_value_iface_t *iface,
+				void *self, size_t index,
+				avro_value_t *child, const char **name);
+
+int
+avro_value_default_set_by_name(const avro_value_iface_t *iface,
+			       void *self, const char *name,
+			       avro_value_t *child, size_t *index);
+
+int
+avro_value_default_set_branch_existing(const avro_value_iface_t *iface,
+				       void *self, int discriminant,
+				       avro_value_t *branch);
+
+
 /**
  * A helper macro for calling a given method in a value instance, if
  * it's present.  If the value's class doesn't implement the given
@@ -405,6 +463,11 @@ avro_value_to_json(const avro_value_t *value,
 
 #define avro_value_call(value, method, dflt, ...) \
     ((value)->iface->method == NULL? (dflt): \
+     (value)->iface->method((value)->iface, (value)->self, __VA_ARGS__))
+
+#define avro_value_call_default(value, method, dflt_method, ...) \
+    ((value)->iface->method == NULL? \
+     (dflt_method)((value)->iface, (value)->self, __VA_ARGS__): \
      (value)->iface->method((value)->iface, (value)->self, __VA_ARGS__))
 
 
@@ -489,10 +552,30 @@ avro_value_to_json(const avro_value_t *value,
 
 #define avro_value_append(value, child, new_index) \
     avro_value_call(value, append, EINVAL, child, new_index)
+#define avro_value_append_existing(value, child, new_index) \
+    avro_value_call_default(value, append_existing, \
+			    avro_value_default_append_existing, \
+			    child, new_index)
 #define avro_value_add(value, key, child, index, is_new) \
     avro_value_call(value, add, EINVAL, key, child, index, is_new)
+#define avro_value_add_existing(value, key, child, index, is_new) \
+    avro_value_call_default(value, add_existing, \
+			    avro_value_default_add_existing, \
+			    key, child, index, is_new)
+#define avro_value_set_by_index(value, index, child, name) \
+    avro_value_call_default(value, set_by_index, \
+			    avro_value_default_set_by_index, \
+			    index, child, name)
+#define avro_value_set_by_name(value, name, child, index) \
+    avro_value_call_default(value, set_by_name, \
+			    avro_value_default_set_by_name, \
+			    name, child, index)
 #define avro_value_set_branch(value, discriminant, branch) \
     avro_value_call(value, set_branch, EINVAL, discriminant, branch)
+#define avro_value_set_branch_existing(value, discriminant, branch) \
+    avro_value_call_default(value, set_branch_existing, \
+			    avro_value_default_set_branch_existing, \
+			    discriminant, branch)
 
 CLOSE_EXTERN
 #endif

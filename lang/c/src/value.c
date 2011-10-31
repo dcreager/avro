@@ -688,3 +688,64 @@ avro_value_copy(avro_value_t *dest, const avro_value_t *src)
 
 	return avro_value_copy_fast(dest, src);
 }
+
+
+int
+avro_value_default_append_existing(const avro_value_iface_t *iface,
+				   void *self, avro_value_t *child_in,
+				   size_t *new_index)
+{
+	int  rval;
+	avro_value_t  parent = { (avro_value_iface_t *) iface, self };
+	avro_value_t  child;
+	check(rval, avro_value_append(&parent, &child, new_index));
+	return avro_value_copy_fast(&child, child_in);
+}
+
+int
+avro_value_default_add_existing(const avro_value_iface_t *iface,
+				void *self, const char *key,
+				avro_value_t *child_in, size_t *index, int *is_new)
+{
+	int  rval;
+	avro_value_t  parent = { (avro_value_iface_t *) iface, self };
+	avro_value_t  child;
+	check(rval, avro_value_add(&parent, key, &child, index, is_new));
+	return avro_value_copy_fast(&child, child_in);
+}
+
+int
+avro_value_default_set_by_index(const avro_value_iface_t *iface,
+				void *self, size_t index,
+				avro_value_t *child_in, const char **name)
+{
+	int  rval;
+	avro_value_t  parent = { (avro_value_iface_t *) iface, self };
+	avro_value_t  child;
+	check(rval, avro_value_get_by_index(&parent, index, &child, name));
+	return avro_value_copy_fast(&child, child_in);
+}
+
+int
+avro_value_default_set_by_name(const avro_value_iface_t *iface,
+			       void *self, const char *name,
+			       avro_value_t *child_in, size_t *index)
+{
+	int  rval;
+	avro_value_t  parent = { (avro_value_iface_t *) iface, self };
+	avro_value_t  child;
+	check(rval, avro_value_get_by_name(&parent, name, &child, index));
+	return avro_value_copy_fast(&child, child_in);
+}
+
+int
+avro_value_default_set_branch_existing(const avro_value_iface_t *iface,
+				       void *self, int discriminant,
+				       avro_value_t *branch_in)
+{
+	int  rval;
+	avro_value_t  parent = { (avro_value_iface_t *) iface, self };
+	avro_value_t  branch;
+	check(rval, avro_value_set_branch(&parent, discriminant, &branch));
+	return avro_value_copy_fast(&branch, branch_in);
+}

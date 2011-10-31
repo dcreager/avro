@@ -779,6 +779,11 @@ avro_value_iface_t  AVRO_DATUM_VALUE_CLASS =
 	avro_datum_value_get_current_branch,
 	/* compound setters */
 	avro_datum_value_append,
+	NULL, /* append_existing */
 	avro_datum_value_add,
-	avro_datum_value_set_branch
+	NULL, /* add_existing */
+	NULL, /* set_by_index */
+	NULL, /* set_by_name */
+	avro_datum_value_set_branch,
+	NULL  /* set_branch_existing */
 };

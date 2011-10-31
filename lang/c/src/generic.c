@@ -685,8 +685,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_LINK_CLASS =
 		avro_generic_link_get_current_branch,
 		/* compound setters */
 		avro_generic_link_append,
+		NULL, /* append_existing */
 		avro_generic_link_add,
-		avro_generic_link_set_branch
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		avro_generic_link_set_branch,
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_link_instance_size,
@@ -828,8 +833,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_BOOLEAN_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_boolean_instance_size,
@@ -998,8 +1008,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_BYTES_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_bytes_instance_size,
@@ -1133,8 +1148,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_DOUBLE_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_double_instance_size,
@@ -1268,8 +1288,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FLOAT_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_float_instance_size,
@@ -1403,8 +1428,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_INT_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_int_instance_size,
@@ -1538,8 +1568,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_LONG_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_long_instance_size,
@@ -1669,8 +1704,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_NULL_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_null_instance_size,
@@ -1871,8 +1911,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_STRING_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_string_instance_size,
@@ -2127,8 +2172,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_ARRAY_CLASS =
 	NULL, /* get_current_branch */
 	/* compound setters */
 	avro_generic_array_append,
+	NULL, /* append_existing */
 	NULL, /* add */
-	NULL  /* set_branch */
+	NULL, /* add_existing */
+	NULL, /* set_by_index */
+	NULL, /* set_by_name */
+	NULL, /* set_branch */
+	NULL  /* set_branch_existing */
 },
 	NULL,
 	avro_generic_array_instance_size,
@@ -2314,8 +2364,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_ENUM_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_enum_instance_size,
@@ -2511,8 +2566,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_FIXED_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_fixed_instance_size,
@@ -2767,8 +2827,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_MAP_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		avro_generic_map_add,
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_map_instance_size,
@@ -3083,8 +3148,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_RECORD_CLASS =
 		NULL, /* get_current_branch */
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		NULL  /* set_branch */
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		NULL, /* set_branch */
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_record_instance_size,
@@ -3492,8 +3562,13 @@ static avro_generic_value_iface_t  AVRO_GENERIC_UNION_CLASS =
 		avro_generic_union_get_current_branch,
 		/* compound setters */
 		NULL, /* append */
+		NULL, /* append_existing */
 		NULL, /* add */
-		avro_generic_union_set_branch
+		NULL, /* add_existing */
+		NULL, /* set_by_index */
+		NULL, /* set_by_name */
+		avro_generic_union_set_branch,
+		NULL  /* set_branch_existing */
 	},
 	NULL,
 	avro_generic_union_instance_size,

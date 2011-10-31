@@ -837,6 +837,18 @@ avro_resolved_link_reader_append(const avro_value_iface_t *iface,
 }
 
 static int
+avro_resolved_link_reader_append_existing(const avro_value_iface_t *iface,
+					  void *vself, avro_value_t *child_out,
+					  size_t *new_index)
+{
+	AVRO_UNUSED(iface);
+	avro_resolved_link_value_t  *self = vself;
+	avro_value_t  *target_vself = self->target.self;
+	*target_vself = self->wrapped;
+	return avro_value_append_existing(&self->target, child_out, new_index);
+}
+
+static int
 avro_resolved_link_reader_add(const avro_value_iface_t *iface,
 			      void *vself, const char *key,
 			      avro_value_t *child, size_t *index, int *is_new)
@@ -849,6 +861,42 @@ avro_resolved_link_reader_add(const avro_value_iface_t *iface,
 }
 
 static int
+avro_resolved_link_reader_add_existing(const avro_value_iface_t *iface,
+				       void *vself, const char *key,
+				       avro_value_t *child, size_t *index, int *is_new)
+{
+	AVRO_UNUSED(iface);
+	avro_resolved_link_value_t  *self = vself;
+	avro_value_t  *target_vself = self->target.self;
+	*target_vself = self->wrapped;
+	return avro_value_add_existing(&self->target, key, child, index, is_new);
+}
+
+static int
+avro_resolved_link_reader_set_by_index(const avro_value_iface_t *iface,
+				       void *vself, size_t index,
+				       avro_value_t *child, const char **name)
+{
+	AVRO_UNUSED(iface);
+	avro_resolved_link_value_t  *self = vself;
+	avro_value_t  *target_vself = self->target.self;
+	*target_vself = self->wrapped;
+	return avro_value_set_by_index(&self->target, index, child, name);
+}
+
+static int
+avro_resolved_link_reader_set_by_name(const avro_value_iface_t *iface,
+				      void *vself, const char *name,
+				      avro_value_t *child, size_t *index)
+{
+	AVRO_UNUSED(iface);
+	avro_resolved_link_value_t  *self = vself;
+	avro_value_t  *target_vself = self->target.self;
+	*target_vself = self->wrapped;
+	return avro_value_set_by_name(&self->target, name, child, index);
+}
+
+static int
 avro_resolved_link_reader_set_branch(const avro_value_iface_t *iface,
 				     void *vself, int discriminant,
 				     avro_value_t *branch)
@@ -858,6 +906,18 @@ avro_resolved_link_reader_set_branch(const avro_value_iface_t *iface,
 	avro_value_t  *target_vself = (avro_value_t *) self->target.self;
 	*target_vself = self->wrapped;
 	return avro_value_set_branch(&self->target, discriminant, branch);
+}
+
+static int
+avro_resolved_link_reader_set_branch_existing(const avro_value_iface_t *iface,
+					      void *vself, int discriminant,
+					      avro_value_t *branch)
+{
+	AVRO_UNUSED(iface);
+	avro_resolved_link_value_t  *self = vself;
+	avro_value_t  *target_vself = self->target.self;
+	*target_vself = self->wrapped;
+	return avro_value_set_branch_existing(&self->target, discriminant, branch);
 }
 
 static avro_resolved_link_reader_t *
@@ -921,8 +981,13 @@ avro_resolved_link_reader_create(avro_schema_t wschema, avro_schema_t rschema)
 	self->parent.get_current_branch = avro_resolved_link_reader_get_current_branch;
 
 	self->parent.append = avro_resolved_link_reader_append;
+	self->parent.append_existing = avro_resolved_link_reader_append_existing;
 	self->parent.add = avro_resolved_link_reader_add;
+	self->parent.add_existing = avro_resolved_link_reader_add_existing;
+	self->parent.set_by_index = avro_resolved_link_reader_set_by_index;
+	self->parent.set_by_name = avro_resolved_link_reader_set_by_name;
 	self->parent.set_branch = avro_resolved_link_reader_set_branch;
+	self->parent.set_branch_existing = avro_resolved_link_reader_set_branch_existing;
 
 	return container_of(self, avro_resolved_link_reader_t, parent);
 }
@@ -2843,6 +2908,17 @@ avro_resolved_wunion_reader_append(const avro_value_iface_t *viface,
 }
 
 static int
+avro_resolved_wunion_reader_append_existing(const avro_value_iface_t *viface,
+					    void *vself, avro_value_t *child_out,
+					    size_t *new_index)
+{
+	int  rval;
+	avro_value_t  src;
+	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
+	return avro_value_append_existing(&src, child_out, new_index);
+}
+
+static int
 avro_resolved_wunion_reader_add(const avro_value_iface_t *viface,
 				void *vself, const char *key,
 				avro_value_t *child, size_t *index, int *is_new)
@@ -2854,6 +2930,39 @@ avro_resolved_wunion_reader_add(const avro_value_iface_t *viface,
 }
 
 static int
+avro_resolved_wunion_reader_add_existing(const avro_value_iface_t *viface,
+					 void *vself, const char *key,
+					 avro_value_t *child, size_t *index, int *is_new)
+{
+	int  rval;
+	avro_value_t  src;
+	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
+	return avro_value_add_existing(&src, key, child, index, is_new);
+}
+
+static int
+avro_resolved_wunion_reader_set_by_index(const avro_value_iface_t *viface,
+					 void *vself, size_t index,
+					 avro_value_t *child, const char **name)
+{
+	int  rval;
+	avro_value_t  src;
+	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
+	return avro_value_set_by_index(&src, index, child, name);
+}
+
+static int
+avro_resolved_wunion_reader_set_by_name(const avro_value_iface_t *viface,
+					void *vself, const char *name,
+					avro_value_t *child, size_t *index)
+{
+	int  rval;
+	avro_value_t  src;
+	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
+	return avro_value_set_by_name(&src, name, child, index);
+}
+
+static int
 avro_resolved_wunion_reader_set_branch(const avro_value_iface_t *viface,
 				       void *vself, int discriminant,
 				       avro_value_t *branch)
@@ -2862,6 +2971,17 @@ avro_resolved_wunion_reader_set_branch(const avro_value_iface_t *viface,
 	avro_value_t  src;
 	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
 	return avro_value_set_branch(&src, discriminant, branch);
+}
+
+static int
+avro_resolved_wunion_reader_set_branch_existing(const avro_value_iface_t *viface,
+						void *vself, int discriminant,
+						avro_value_t *branch)
+{
+	int  rval;
+	avro_value_t  src;
+	check(rval, avro_resolved_wunion_get_real_src(viface, vself, &src));
+	return avro_value_set_branch_existing(&src, discriminant, branch);
 }
 
 static avro_resolved_wunion_reader_t *
@@ -2914,8 +3034,13 @@ avro_resolved_wunion_reader_create(avro_schema_t wschema, avro_schema_t rschema)
 	self->parent.get_current_branch = avro_resolved_wunion_reader_get_current_branch;
 
 	self->parent.append = avro_resolved_wunion_reader_append;
+	self->parent.append_existing = avro_resolved_wunion_reader_append_existing;
 	self->parent.add = avro_resolved_wunion_reader_add;
+	self->parent.add_existing = avro_resolved_wunion_reader_add_existing;
+	self->parent.set_by_index = avro_resolved_wunion_reader_set_by_index;
+	self->parent.set_by_name = avro_resolved_wunion_reader_set_by_name;
 	self->parent.set_branch = avro_resolved_wunion_reader_set_branch;
+	self->parent.set_branch_existing = avro_resolved_wunion_reader_set_branch_existing;
 
 	self->refcount = 1;
 	self->wschema = avro_schema_incref(wschema);
