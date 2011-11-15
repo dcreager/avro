@@ -174,6 +174,8 @@ avro_value_to_json_t(const avro_value_t *value)
 			const char  *val;
 			size_t  size;
 			check_return(NULL, avro_value_get_string(value, &val, &size));
+                        printf("... %p %zu %p\n", value->self, size, val);
+                        printf("    %d\n", val[size-1]);
 			return_json("string", json_string(val));
 		}
 

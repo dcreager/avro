@@ -108,8 +108,8 @@ static void
 avro_generic_value_free(const avro_value_iface_t *iface, void *self)
 {
 	if (self != NULL) {
-		avro_value_t  vself = { (avro_value_iface_t *) iface, self };
-		avro_value_reset(&vself);
+		//avro_value_t  vself = { (avro_value_iface_t *) iface, self };
+		//avro_value_reset(&vself);
 
 		/* Instead of actually freeing the instance, return it
 		 * to the free list. */
@@ -2085,7 +2085,7 @@ avro_generic_array_append(const avro_value_iface_t *viface,
 		self->allocated_elements++;
 	} else {
 		/* This is a reused element */
-		check(rval, avro_value_reset(child));
+		//check(rval, avro_value_reset(child));
 	}
 	if (new_index_out != NULL) {
 		*new_index_out = new_size - 1;
@@ -2917,10 +2917,18 @@ typedef struct avro_generic_record_value_iface {
 } avro_generic_record_value_iface_t;
 
 typedef struct avro_generic_record {
-	/* The rest of the struct is taken up by the inline storage
-	 * needed for each field. */
+	/* The first part of the struct is a bunch of avro_value_t
+	 * instances; one for each field.  Most of the time, these point
+	 * into the field storage later on in the struct. */
+
+	/* After the avro_value_t instances, the rest of the struct is
+	 * taken up by the inline storage needed for each field. */
 } avro_generic_record_t;
 
+
+/** Return a pointer to the avro_value_t instance for the given field. */
+#define avro_generic_record_field_value(iface, rec, index) \
+	((avro_value_t *) (((void *) (rec)) + (sizeof(avro_value_t) * (index))))
 
 /** Return a pointer to the given field within a record struct. */
 #define avro_generic_record_field(iface, rec, index) \
@@ -2970,11 +2978,22 @@ avro_generic_record_reset(const avro_value_iface_t *viface, void *vself)
 	avro_generic_record_t  *self = (avro_generic_record_t *) vself;
 	size_t  i;
 	for (i = 0; i < iface->field_count; i++) {
+		/* If our managed, inline storage is selected for this
+		 * field, just reset it.  Otherwise, drop our reference
+		 * to the external field value, and reset the inline
+		 * storage, and point at it. */
 		avro_value_t  value = {
 			&iface->field_ifaces[i]->parent,
 			avro_generic_record_field(iface, self, i)
 		};
 		check(rval, avro_value_reset(&value));
+
+		avro_value_t  *field_value =
+		    avro_generic_record_field_value(iface, self, i);
+		if (field_value->iface != &iface->field_ifaces[i]->parent) {
+			avro_value_decref(field_value);
+			avro_value_move_ref(field_value, &value);
+		}
 	}
 	return 0;
 }
@@ -3021,8 +3040,36 @@ avro_generic_record_get_by_index(const avro_value_iface_t *viface,
 		avro_set_error("Field index %" PRIsz " out of range", index);
 		return EINVAL;
 	}
-	child->iface = &iface->field_ifaces[index]->parent;
-	child->self = avro_generic_record_field(iface, self, index);
+	avro_value_t  *field_value =
+	    avro_generic_record_field_value(iface, self, index);
+	*child = *field_value;
+
+	/*
+	 * Grab the field name from the schema if asked for.
+	 */
+	if (name != NULL) {
+		avro_schema_t  schema = iface->schema;
+		*name = avro_schema_record_field_name(schema, index);
+	}
+
+	return 0;
+}
+
+static int
+avro_generic_record_set_by_index(const avro_value_iface_t *viface,
+				 void *vself, size_t index,
+				 avro_value_t *child, const char **name)
+{
+	const avro_generic_record_value_iface_t  *iface =
+	    container_of(viface, avro_generic_record_value_iface_t, parent);
+	avro_generic_record_t  *self = vself;
+	if (index >= iface->field_count) {
+		avro_set_error("Field index %zu out of range", index);
+		return EINVAL;
+	}
+	avro_value_t  *field_value =
+	    avro_generic_record_field_value(iface, self, index);
+	avro_value_move_ref(field_value, child);
 
 	/*
 	 * Grab the field name from the schema if asked for.
@@ -3051,8 +3098,34 @@ avro_generic_record_get_by_name(const avro_value_iface_t *viface,
 		return EINVAL;
 	}
 
-	child->iface = &iface->field_ifaces[index]->parent;
-	child->self = avro_generic_record_field(iface, self, index);
+	avro_value_t  *field_value =
+	    avro_generic_record_field_value(iface, self, index);
+	*child = *field_value;
+	if (index_out != NULL) {
+		*index_out = index;
+	}
+	return 0;
+}
+
+static int
+avro_generic_record_set_by_name(const avro_value_iface_t *viface,
+				void *vself, const char *name,
+				avro_value_t *child, size_t *index_out)
+{
+	const avro_generic_record_value_iface_t  *iface =
+	    container_of(viface, avro_generic_record_value_iface_t, parent);
+	avro_generic_record_t  *self = vself;
+
+	avro_schema_t  schema = iface->schema;
+	int  index = avro_schema_record_field_get_index(schema, name);
+	if (index < 0) {
+		avro_set_error("Unknown record field %s", name);
+		return EINVAL;
+	}
+
+	avro_value_t  *field_value =
+	    avro_generic_record_field_value(iface, self, index);
+	avro_value_copy_ref(field_value, child);
 	if (index_out != NULL) {
 		*index_out = index;
 	}
@@ -3076,11 +3149,18 @@ avro_generic_record_init(const avro_value_iface_t *viface, void *vself)
 	avro_generic_record_t  *self = (avro_generic_record_t *) vself;
 
 	/* Initialize each field */
+	//printf("--- INIT\n    self = %p\n", self);
 	size_t  i;
 	for (i = 0; i < iface->field_count; i++) {
+		avro_value_t  *field_value =
+		    avro_generic_record_field_value(iface, self, i);
+		//printf("  %3zu fv = %p\n", i, field_value);
+		field_value->iface = &iface->field_ifaces[i]->parent;
+		field_value->self = avro_generic_record_field(iface, self, i);
+		//printf("     fvs = %p\n", field_value->self);
+
 		check(rval, avro_value_init
-		      (iface->field_ifaces[i],
-		       avro_generic_record_field(iface, self, i)));
+		      (iface->field_ifaces[i], field_value->self));
 	}
 
 	return 0;
@@ -3096,6 +3176,11 @@ avro_generic_record_done(const avro_value_iface_t *viface, void *vself)
 	for (i = 0; i < iface->field_count; i++) {
 		avro_value_done(iface->field_ifaces[i],
 				avro_generic_record_field(iface, self, i));
+		avro_value_t  *field_value =
+		    avro_generic_record_field_value(iface, self, i);
+		if (field_value->iface != &iface->field_ifaces[i]->parent) {
+			avro_value_decref(field_value);
+		}
 	}
 }
 
@@ -3151,8 +3236,8 @@ static avro_generic_value_iface_t  AVRO_GENERIC_RECORD_CLASS =
 		NULL, /* append_existing */
 		NULL, /* add */
 		NULL, /* add_existing */
-		NULL, /* set_by_index */
-		NULL, /* set_by_name */
+		avro_generic_record_set_by_index,
+		avro_generic_record_set_by_name,
 		NULL, /* set_branch */
 		NULL  /* set_branch_existing */
 	},
@@ -3192,7 +3277,9 @@ avro_generic_record_class(avro_schema_t schema, memoize_state_t *state)
 		goto error;
 	}
 
-	size_t  next_offset = sizeof(avro_generic_record_t);
+	size_t  next_offset =
+	    sizeof(avro_generic_record_t) +
+	    (sizeof(avro_value_t) * iface->field_count);
 #if DEBUG_FIELD_OFFSETS
 	fprintf(stderr, "  Record %s\n  Header: Offset 0, size %" PRIsz "\n",
 		avro_schema_type_name(schema),
@@ -3296,9 +3383,16 @@ typedef struct avro_generic_union_value_iface {
 } avro_generic_union_value_iface_t;
 
 typedef struct avro_generic_union {
+	/** The current active branch. */
+	avro_value_t  branch;
+
 	/** The currently active branch of the union.  -1 if no branch
 	 * is selected. */
 	int  discriminant;
+
+	/** Whether the current branch is managed by us or an external
+	 * value. */
+	int  our_branch;
 
 	/** Which branches have been initialized */
 	unsigned char  *branch_initialized;
@@ -3370,6 +3464,14 @@ avro_generic_union_reset(const avro_value_iface_t *viface, void *vself)
 			check(rval, avro_value_reset(&value));
 		}
 	}
+
+	/* If we were pointing at an external branch, drop our reference
+	 * to it. */
+	if (!self->our_branch) {
+		avro_value_decref(&self->branch);
+		self->discriminant = -1;
+		self->our_branch = 1;
+	}
 	return 0;
 }
 
@@ -3404,15 +3506,13 @@ static int
 avro_generic_union_get_current_branch(const avro_value_iface_t *viface,
 				      const void *vself, avro_value_t *branch)
 {
-	const avro_generic_union_value_iface_t  *iface =
-	    container_of(viface, avro_generic_union_value_iface_t, parent);
+	AVRO_UNUSED(viface);
 	const avro_generic_union_t  *self = (const avro_generic_union_t *) vself;
 	if (self->discriminant < 0) {
 		avro_set_error("Union has no selected branch");
 		return EINVAL;
 	}
-	branch->iface = &iface->branch_ifaces[self->discriminant]->parent;
-	branch->self = avro_generic_union_branch(iface, self, self->discriminant);
+	*branch = self->branch;
 	return 0;
 }
 
@@ -3426,43 +3526,74 @@ avro_generic_union_set_branch(const avro_value_iface_t *viface,
 	int  rval;
 	avro_generic_union_t  *self = (avro_generic_union_t *) vself;
 
+	/* If we were already pointing at an external branch, release
+	 * our reference to it. */
+	if (!self->our_branch) {
+		avro_value_decref(&self->branch);
+	}
+
 #if DEBUG_BRANCHES
 	fprintf(stderr, "Selecting branch %d (was %d)\n",
 		discriminant, self->discriminant);
 #endif
 	self->discriminant = discriminant;
+	self->our_branch = 1;
 
 	/*
 	 * If the caller selected "no branch", then we don't need to
 	 * initialize anything.
 	 */
 	if (discriminant < 0) {
-		if (branch != NULL) {
-			branch->iface = NULL;
-			branch->self = NULL;
-		}
-		return 0;
-	}
+		self->branch.iface = NULL;
+		self->branch.self = NULL;
+	} else {
+		self->branch.iface =
+		    &iface->branch_ifaces[discriminant]->parent;
+		self->branch.self =
+		    avro_generic_union_branch(iface, self, discriminant);
 
-	/*
-	 * If the new desired branch hasn't been initialized yet, then
-	 * initialize it.
-	 */
-	if (!self->branch_initialized[discriminant]) {
+		/*
+		 * If the new desired branch hasn't been initialized
+		 * yet, then initialize it.
+		 */
+		if (!self->branch_initialized[discriminant]) {
 #if DEBUG_BRANCHES
-		fprintf(stderr, "Initializing branch %d\n", discriminant);
+			fprintf(stderr, "Initializing branch %d\n", discriminant);
 #endif
-		check(rval, avro_value_init
-		      (iface->branch_ifaces[discriminant],
-		       avro_generic_union_branch(iface, self, discriminant)));
-		self->branch_initialized[discriminant] = 1;
+			check(rval, avro_value_init
+			      (iface->branch_ifaces[discriminant], self->branch.self));
+			self->branch_initialized[discriminant] = 1;
+		}
 	}
 
 	if (branch != NULL) {
-		branch->iface = &iface->branch_ifaces[discriminant]->parent;
-		branch->self = avro_generic_union_branch(iface, self, discriminant);
+		*branch = self->branch;
 	}
 
+	return 0;
+}
+
+static int
+avro_generic_union_set_branch_existing(const avro_value_iface_t *viface,
+				       void *vself, int discriminant,
+				       avro_value_t *branch)
+{
+	AVRO_UNUSED(viface);
+	avro_generic_union_t  *self = vself;
+
+	/* If we were already pointing at an external branch, release
+	 * our reference to it. */
+	if (!self->our_branch) {
+		avro_value_decref(&self->branch);
+	}
+
+#if DEBUG_BRANCHES
+	fprintf(stderr, "Selecting branch %d (was %d)\n",
+		discriminant, self->discriminant);
+#endif
+	self->discriminant = discriminant;
+	self->our_branch = 0;
+	avro_value_move_ref(&self->branch, branch);
 	return 0;
 }
 
@@ -3481,6 +3612,9 @@ avro_generic_union_init(const avro_value_iface_t *viface, void *vself)
 	    container_of(viface, avro_generic_union_value_iface_t, parent);
 	avro_generic_union_t  *self = vself;
 	self->discriminant = -1;
+	self->our_branch = 1;
+	self->branch.iface = NULL;
+	self->branch.self = NULL;
 	size_t  bi_size = sizeof(unsigned char) * iface->branch_count;
 	self->branch_initialized = avro_malloc(bi_size);
 	if (self->branch_initialized == NULL) {
@@ -3507,6 +3641,12 @@ avro_generic_union_done(const avro_value_iface_t *viface, void *vself)
 			    (iface->branch_ifaces[i],
 			     avro_generic_union_branch(iface, self, i));
 		}
+	}
+
+	/* If we were pointing at an external branch, drop our reference
+	 * to it. */
+	if (!self->our_branch) {
+		avro_value_decref(&self->branch);
 	}
 
 	avro_free(self->branch_initialized,
@@ -3568,7 +3708,7 @@ static avro_generic_value_iface_t  AVRO_GENERIC_UNION_CLASS =
 		NULL, /* set_by_index */
 		NULL, /* set_by_name */
 		avro_generic_union_set_branch,
-		NULL  /* set_branch_existing */
+		avro_generic_union_set_branch_existing
 	},
 	NULL,
 	avro_generic_union_instance_size,

@@ -275,6 +275,7 @@ avro_raw_string_give(avro_raw_string_t *str,
 	avro_wrapped_buffer_move(&str->wrapped, src);
 }
 
+#include <stdio.h>
 int
 avro_raw_string_grab(const avro_raw_string_t *str,
 		     avro_wrapped_buffer_t *dest)

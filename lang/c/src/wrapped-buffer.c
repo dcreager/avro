@@ -54,6 +54,7 @@ avro_wrapped_copy_copy(avro_wrapped_buffer_t *dest,
 	return 0;
 }
 
+#include <stdio.h>
 int
 avro_wrapped_buffer_new_copy(avro_wrapped_buffer_t *dest,
 			     const void *buf, size_t length)
