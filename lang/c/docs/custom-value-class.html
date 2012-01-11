@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>custom-value-class.c</title>
+  <link rel="stylesheet" href="http://jashkenas.github.com/docco/resources/docco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div id="jump_to">
+    Jump To &hellip;
+    <div id="jump_wrapper">
+      <div id="jump_page">
+          <a class="source" href="avro-values.html">avro-values.c</a>
+          <a class="source" href="custom-value-class.html">custom-value-class.c</a>
+      </div>
+    </div>
+  </div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>custom-value-class.c</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="cp">#include &lt;string.h&gt;</span>
+<span class="cp">#include &lt;avro.h&gt;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-2'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-2">&#182;</a>
+        </div>
+        <p>This example assumes that you already know how to create Avro data
+using the <a href="avro-values.html">generic value implementation</a>.  This
+page describes how to squeeze out a bit more performance by writing a
+custom value implementation.  We&rsquo;re going to reuse a couple of the
+functions, and the application data type, defined there.</p>
+
+<p>We&rsquo;re also going to use the same Avro schema:</p>
+
+<pre><code>{
+  &ldquo;type&rdquo;: &ldquo;record&rdquo;,
+  &ldquo;name&rdquo;: &ldquo;person&rdquo;,
+  &ldquo;fields&rdquo;: [
+    {&ldquo;name&rdquo;: &ldquo;first_name&rdquo;, &ldquo;type&rdquo;: &ldquo;string&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;last_name&rdquo;, &ldquo;type&rdquo;: &ldquo;string&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;age&rdquo;, &ldquo;type&rdquo;: &ldquo;int&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;children&rdquo;, &ldquo;type&rdquo;:
+     {&ldquo;type&rdquo;: &ldquo;array&rdquo;, &ldquo;items&rdquo;: &ldquo;person&rdquo;}}
+  ]
+}
+</code></pre>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">struct</span> <span class="n">person</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="kt">char</span>  <span class="o">*</span><span class="n">first_name</span><span class="p">;</span>
+    <span class="k">const</span> <span class="kt">char</span>  <span class="o">*</span><span class="n">last_name</span><span class="p">;</span>
+    <span class="kt">int</span>  <span class="n">age</span><span class="p">;</span>
+    <span class="kt">size_t</span>  <span class="n">child_count</span><span class="p">;</span>
+    <span class="k">struct</span> <span class="n">person</span>  <span class="o">**</span><span class="n">children</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">avro_schema_t</span>
+<span class="n">create_person_schema</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Preliminaries'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Preliminaries">&#182;</a>
+        </div>
+        <h2>Preliminaries</h2>
+
+<p>Each value implementation is defined by an instance of the
+<code>avro_value_iface_t</code> struct.  This type contains a slew of function
+pointers, which provide the actual implementations of most of the
+<code>avro_value_*</code> functions that you call to interact with an Avro
+value.  The interface struct is rather large, so we&rsquo;re not going to
+reproduce it here, but you can find its definition in
+<code>avro/value.h</code>.</p>
+
+<p>Each value consists of two pointers: a pointer to a value
+implementation, and a <code>self</code> pointer.  Each value implementation is
+free to interpret the <code>self</code> pointer however they wish.  We&rsquo;ll use it
+as a pointer to an existing <code>struct person</code> object.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-4'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-4">&#182;</a>
+        </div>
+        <p>Our goal is to write a value implementation that accesses a <code>struct
+person</code> directly when you call the &ldquo;getter&rdquo; functions —
+<code>avro_value_get_*</code>.  We&rsquo;ll end up with one <code>avro_value_iface_t</code> for
+the <code>&ldquo;person&rdquo;</code> record type, as one as one for each of the fields in
+the record.  The implementation structs themselves are pretty simple;
+we define the <code>get_type</code> and <code>get_schema</code> methods for each of them,
+and whichever getter methods are appropriate for that
+implementation&rsquo;s schema type.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_iface</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_first_name_iface</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_last_name_iface</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_age_iface</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_children_iface</span><span class="p">;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Initializing_a_value'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Initializing_a_value">&#182;</a>
+        </div>
+        <h2>Initializing a value</h2>
+
+<p>We can go ahead and define the function that initializes an
+<code>avro_value_t</code> so that it wraps a <code>struct person</code> object.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="kt">int</span>
+<span class="nf">wrap_person</span><span class="p">(</span><span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="k">struct</span> <span class="n">person</span> <span class="o">*</span><span class="n">src</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_iface</span><span class="p">;</span>
+    <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="n">src</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-A_quick_note_about_schemas'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-A_quick_note_about_schemas">&#182;</a>
+        </div>
+        <h2>A quick note about schemas</h2>
+
+<p>Each of the value implementations needs to provide the <code>get_schema</code>
+method, which returns the Avro schema represented an Avro value that
+uses that implementation.  This method is called fairly often, so we
+want to cache the schema value across calls.</p>
+
+<p>(Note that this function is <strong>not</strong> thread-safe.)</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_schema_t</span>  <span class="n">CACHED_PERSON_SCHEMA</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">get_cached_person_schema</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">CACHED_PERSON_SCHEMA</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">CACHED_PERSON_SCHEMA</span> <span class="o">=</span> <span class="n">create_person_schema</span><span class="p">();</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">CACHED_PERSON_SCHEMA</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Top-level_record'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Top-level_record">&#182;</a>
+        </div>
+        <h2>Top-level record</h2>
+
+<p>Each of our value implementations needs <code>get_type</code> and <code>get_schema</code>:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_type_t</span>
+<span class="nf">person_get_type</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">AVRO_RECORD</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">person_get_schema</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">get_cached_person_schema</span><span class="p">();</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-8'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-8">&#182;</a>
+        </div>
+        <p>For a <code>record</code> schema, we need to define the <code>get_size</code>,
+<code>get_by_index</code>, and <code>get_by_name</code> methods.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_get_size</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">self</span><span class="p">,</span>
+                <span class="kt">size_t</span> <span class="o">*</span><span class="n">size</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="cm">/* There are four fields in the person schema */</span>
+    <span class="o">*</span><span class="n">size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_get_by_index</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">self</span><span class="p">,</span>
+                    <span class="kt">size_t</span> <span class="n">index</span><span class="p">,</span> <span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">**</span><span class="n">name</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">switch</span> <span class="p">(</span><span class="n">index</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="mi">0</span>:
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_first_name_iface</span><span class="p">;</span>
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">name</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;first_name&quot;</span><span class="p">;</span> <span class="p">}</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="k">case</span> <span class="mi">1</span>:
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_last_name_iface</span><span class="p">;</span>
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">name</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;last_name&quot;</span><span class="p">;</span> <span class="p">}</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="k">case</span> <span class="mi">2</span>:
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_age_iface</span><span class="p">;</span>
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">name</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;age&quot;</span><span class="p">;</span> <span class="p">}</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="k">case</span> <span class="mi">3</span>:
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_children_iface</span><span class="p">;</span>
+            <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">name</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;children&quot;</span><span class="p">;</span> <span class="p">}</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="nl">default:</span>
+            <span class="n">avro_set_error</span><span class="p">(</span><span class="s">&quot;Invalid person field index %zu&quot;</span><span class="p">,</span> <span class="n">index</span><span class="p">);</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_get_by_name</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">self</span><span class="p">,</span>
+                   <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">name</span><span class="p">,</span> <span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="kt">size_t</span> <span class="o">*</span><span class="n">index</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s">&quot;first_name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_first_name_iface</span><span class="p">;</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">index</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="p">}</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s">&quot;last_name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_last_name_iface</span><span class="p">;</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">index</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="p">}</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s">&quot;age&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_age_iface</span><span class="p">;</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">index</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span> <span class="p">}</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">strcmp</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s">&quot;children&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_children_iface</span><span class="p">;</span>
+        <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> <span class="o">*</span><span class="n">index</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span> <span class="p">}</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">avro_set_error</span><span class="p">(</span><span class="s">&quot;Invalid person field name %s&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">);</span>
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-First_name'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-First_name">&#182;</a>
+        </div>
+        <h2>First name</h2>
+
+<p>Each of our value implementations needs <code>get_type</code> and <code>get_schema</code>:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_type_t</span>
+<span class="nf">person_first_name_get_type</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                           <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">AVRO_STRING</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">person_first_name_get_schema</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_t</span>  <span class="n">person</span> <span class="o">=</span> <span class="n">get_cached_person_schema</span><span class="p">();</span>
+    <span class="k">return</span> <span class="n">avro_schema_record_field_get_by_index</span><span class="p">(</span><span class="n">person</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-10'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-10">&#182;</a>
+        </div>
+        <p>For a <code>string</code> schema, we need to define the <code>get_string</code> and
+<code>grab_string</code> methods.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_first_name_get_string</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">**</span><span class="n">str</span><span class="p">,</span>
+                             <span class="kt">size_t</span> <span class="o">*</span><span class="n">size</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="o">*</span><span class="n">str</span> <span class="o">=</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">first_name</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">size</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="cm">/* size must include NUL terminator */</span>
+        <span class="o">*</span><span class="n">size</span> <span class="o">=</span> <span class="n">strlen</span><span class="p">(</span><span class="n">self</span><span class="o">-&gt;</span><span class="n">first_name</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_first_name_grab_string</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                              <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span>
+                              <span class="n">avro_wrapped_buffer_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">avro_wrapped_buffer_new_string</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">first_name</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Last_name'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Last_name">&#182;</a>
+        </div>
+        <h2>Last name</h2>
+
+<p>Each of our value implementations needs <code>get_type</code> and <code>get_schema</code>:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_type_t</span>
+<span class="nf">person_last_name_get_type</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                          <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">AVRO_STRING</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">person_last_name_get_schema</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                            <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_t</span>  <span class="n">person</span> <span class="o">=</span> <span class="n">get_cached_person_schema</span><span class="p">();</span>
+    <span class="k">return</span> <span class="n">avro_schema_record_field_get_by_index</span><span class="p">(</span><span class="n">person</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-12'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-12">&#182;</a>
+        </div>
+        <p>For a <code>string</code> schema, we need to define the <code>get_string</code> and
+<code>grab_string</code> methods.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_last_name_get_string</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                            <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">**</span><span class="n">str</span><span class="p">,</span>
+                            <span class="kt">size_t</span> <span class="o">*</span><span class="n">size</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="o">*</span><span class="n">str</span> <span class="o">=</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">last_name</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">size</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="cm">/* size must include NUL terminator */</span>
+        <span class="o">*</span><span class="n">size</span> <span class="o">=</span> <span class="n">strlen</span><span class="p">(</span><span class="n">self</span><span class="o">-&gt;</span><span class="n">last_name</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_last_name_grab_string</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span>
+                             <span class="n">avro_wrapped_buffer_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">avro_wrapped_buffer_new_string</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">last_name</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Age'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Age">&#182;</a>
+        </div>
+        <h2>Age</h2>
+
+<p>Each of our value implementations needs <code>get_type</code> and <code>get_schema</code>:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_type_t</span>
+<span class="nf">person_age_get_type</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                    <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">AVRO_INT32</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">person_age_get_schema</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                      <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_t</span>  <span class="n">person</span> <span class="o">=</span> <span class="n">get_cached_person_schema</span><span class="p">();</span>
+    <span class="k">return</span> <span class="n">avro_schema_record_field_get_by_index</span><span class="p">(</span><span class="n">person</span><span class="p">,</span> <span class="mi">2</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-14'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-14">&#182;</a>
+        </div>
+        <p>For an <code>int</code> schema, we need to define the <code>get_int</code> method.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_age_get_int</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                   <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="o">*</span><span class="n">out</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="o">*</span><span class="n">out</span> <span class="o">=</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">age</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Children'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Children">&#182;</a>
+        </div>
+        <h2>Children</h2>
+
+<p>Each of our value implementations needs <code>get_type</code> and <code>get_schema</code>:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_type_t</span>
+<span class="nf">person_children_get_type</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                         <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">AVRO_ARRAY</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">avro_schema_t</span>
+<span class="nf">person_children_get_schema</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                           <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_t</span>  <span class="n">person</span> <span class="o">=</span> <span class="n">get_cached_person_schema</span><span class="p">();</span>
+    <span class="k">return</span> <span class="n">avro_schema_record_field_get_by_index</span><span class="p">(</span><span class="n">person</span><span class="p">,</span> <span class="mi">3</span><span class="p">);</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-16'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-16">&#182;</a>
+        </div>
+        <p>For an <code>array</code> schema, we need to define the <code>get_size</code> and
+<code>get_by_index</code> method.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_children_get_size</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                         <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span> <span class="kt">size_t</span> <span class="o">*</span><span class="n">size</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="o">*</span><span class="n">size</span> <span class="o">=</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">child_count</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span>
+<span class="nf">person_children_get_by_index</span><span class="p">(</span><span class="k">const</span> <span class="n">avro_value_iface_t</span> <span class="o">*</span><span class="n">iface</span><span class="p">,</span>
+                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">vself</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">index</span><span class="p">,</span>
+                             <span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">**</span><span class="n">name</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span>  <span class="o">*</span><span class="n">self</span> <span class="o">=</span> <span class="n">vself</span><span class="p">;</span>
+    <span class="n">dest</span><span class="o">-&gt;</span><span class="n">iface</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">person_iface</span><span class="p">;</span>
+    <span class="n">dest</span><span class="o">-&gt;</span><span class="n">self</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="n">self</span><span class="o">-&gt;</span><span class="n">children</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Implementation_structs'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Implementation_structs">&#182;</a>
+        </div>
+        <h2>Implementation structs</h2>
+
+<p>With all of the individual methods defined, our last step is to
+define each of the value implementation structs.</p>
+
+<p>Yes, this is pretty repetitive.  We should probably add some helper
+macros to the Avro library to simplify this.</p>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_iface</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* reset */</span>
+    <span class="n">person_get_type</span><span class="p">,</span>
+    <span class="n">person_get_schema</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_fixed */</span>
+    <span class="n">person_get_size</span><span class="p">,</span>
+    <span class="n">person_get_by_index</span><span class="p">,</span>
+    <span class="n">person_get_by_name</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_discriminant */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_current_branch */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* append */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* add */</span>
+    <span class="nb">NULL</span>  <span class="cm">/* set_branch */</span>
+<span class="p">};</span>
+
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_first_name_iface</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* reset */</span>
+    <span class="n">person_first_name_get_type</span><span class="p">,</span>
+    <span class="n">person_first_name_get_schema</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_null */</span>
+    <span class="n">person_first_name_get_string</span><span class="p">,</span>
+    <span class="n">person_first_name_grab_string</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_size */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_index */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_name */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_discriminant */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_current_branch */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* append */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* add */</span>
+    <span class="nb">NULL</span>  <span class="cm">/* set_branch */</span>
+<span class="p">};</span>
+
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_last_name_iface</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* reset */</span>
+    <span class="n">person_last_name_get_type</span><span class="p">,</span>
+    <span class="n">person_last_name_get_schema</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_null */</span>
+    <span class="n">person_last_name_get_string</span><span class="p">,</span>
+    <span class="n">person_last_name_grab_string</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_size */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_index */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_name */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_discriminant */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_current_branch */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* append */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* add */</span>
+    <span class="nb">NULL</span>  <span class="cm">/* set_branch */</span>
+<span class="p">};</span>
+
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_age_iface</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* reset */</span>
+    <span class="n">person_age_get_type</span><span class="p">,</span>
+    <span class="n">person_age_get_schema</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_float */</span>
+    <span class="n">person_age_get_int</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_size */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_index */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_name */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_discriminant */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_current_branch */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* append */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* add */</span>
+    <span class="nb">NULL</span>  <span class="cm">/* set_branch */</span>
+<span class="p">};</span>
+
+<span class="k">static</span> <span class="n">avro_value_iface_t</span>  <span class="n">person_children_iface</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref_iface */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* incref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* decref */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* reset */</span>
+    <span class="n">person_children_get_type</span><span class="p">,</span>
+    <span class="n">person_children_get_schema</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* grab_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_boolean */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_bytes */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_double */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_float */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_int */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_long */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_null */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_string_len */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_enum */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* set_fixed */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* give_fixed */</span>
+    <span class="n">person_children_get_size</span><span class="p">,</span>
+    <span class="n">person_children_get_by_index</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_by_name */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_discriminant */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* get_current_branch */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* append */</span>
+    <span class="nb">NULL</span><span class="p">,</span> <span class="cm">/* add */</span>
+    <span class="nb">NULL</span>  <span class="cm">/* set_branch */</span>
+<span class="p">};</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>

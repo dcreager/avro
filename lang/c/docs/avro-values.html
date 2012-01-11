@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>avro-values.c</title>
+  <link rel="stylesheet" href="http://jashkenas.github.com/docco/resources/docco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div id="jump_to">
+    Jump To &hellip;
+    <div id="jump_wrapper">
+      <div id="jump_page">
+          <a class="source" href="avro-values.html">avro-values.c</a>
+          <a class="source" href="custom-value-class.html">custom-value-class.c</a>
+      </div>
+    </div>
+  </div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>avro-values.c</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="cp">#include &lt;avro.h&gt;</span>
+<span class="cp">#include &lt;libcork/core.h&gt;</span>
+<span class="cp">#include &lt;libcork/core/checkers.h&gt;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-2'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-2">&#182;</a>
+        </div>
+        <p>Let&rsquo;s say your producing some Avro data, and moreover, that you&rsquo;re
+adding this functionality to an existing application.  That means
+that you&rsquo;ve probably already got some C type (or family of types) to
+model and store your data.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">struct</span> <span class="n">person</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="kt">char</span>  <span class="o">*</span><span class="n">first_name</span><span class="p">;</span>
+    <span class="k">const</span> <span class="kt">char</span>  <span class="o">*</span><span class="n">last_name</span><span class="p">;</span>
+    <span class="kt">int</span>  <span class="n">age</span><span class="p">;</span>
+    <span class="kt">size_t</span>  <span class="n">child_count</span><span class="p">;</span>
+    <span class="k">struct</span> <span class="n">person</span>  <span class="o">**</span><span class="n">children</span><span class="p">;</span>
+<span class="p">};</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-3'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-3">&#182;</a>
+        </div>
+        <p>Given this data type, you might decide to output Avro data that
+conforms to the following schema:</p>
+
+<pre><code>{
+  &ldquo;type&rdquo;: &ldquo;record&rdquo;,
+  &ldquo;name&rdquo;: &ldquo;person&rdquo;,
+  &ldquo;fields&rdquo;: [
+    {&ldquo;name&rdquo;: &ldquo;first_name&rdquo;, &ldquo;type&rdquo;: &ldquo;string&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;last_name&rdquo;, &ldquo;type&rdquo;: &ldquo;string&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;age&rdquo;, &ldquo;type&rdquo;: &ldquo;int&rdquo;},
+    {&ldquo;name&rdquo;: &ldquo;children&rdquo;, &ldquo;type&rdquo;:
+     {&ldquo;type&rdquo;: &ldquo;array&rdquo;, &ldquo;items&rdquo;: &ldquo;person&rdquo;}}
+  ]
+}
+</code></pre>
+
+<p>Out of the box, the only way to create Avro data of this schema is to
+use the Avro library&rsquo;s <em>generic value implementation</em>.  This involves
+a number of steps.  First, you have to get the schema yourself into
+your C code somehow.  Currently, the easiest way to do this is to
+embed the JSON representation as a string-literal.</p>
+
+<p>It&rsquo;s annoying, yes, and eventually it would be nice to have a tool
+that auto-escapes for us, but then again, in vi, <code>:s/&ldquo;/\\&rdquo;/g</code> escapes
+all of the JSON quotes, <code>I&quot;</code> inserts a quote at the beginning of the
+line, <code>A&quot;</code> inserts one at the end, and <code>.</code> is your magic “repeat the
+last command” button.  So the manual escaping only takes 1 minute
+once you get the hang of it.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">static</span> <span class="k">const</span> <span class="kt">char</span>  <span class="n">PERSON_SCHEMA</span><span class="p">[]</span> <span class="o">=</span>
+<span class="s">&quot;{&quot;</span>
+<span class="s">&quot;  </span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">record</span><span class="se">\&quot;</span><span class="s">,&quot;</span>
+<span class="s">&quot;  </span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">person</span><span class="se">\&quot;</span><span class="s">,&quot;</span>
+<span class="s">&quot;  </span><span class="se">\&quot;</span><span class="s">fields</span><span class="se">\&quot;</span><span class="s">: [&quot;</span>
+<span class="s">&quot;    {</span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">first_name</span><span class="se">\&quot;</span><span class="s">, </span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">string</span><span class="se">\&quot;</span><span class="s">},&quot;</span>
+<span class="s">&quot;    {</span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">last_name</span><span class="se">\&quot;</span><span class="s">, </span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">string</span><span class="se">\&quot;</span><span class="s">},&quot;</span>
+<span class="s">&quot;    {</span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">age</span><span class="se">\&quot;</span><span class="s">, </span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">int</span><span class="se">\&quot;</span><span class="s">},&quot;</span>
+<span class="s">&quot;    {</span><span class="se">\&quot;</span><span class="s">name</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">children</span><span class="se">\&quot;</span><span class="s">, </span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: &quot;</span>
+<span class="s">&quot;     {</span><span class="se">\&quot;</span><span class="s">type</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">array</span><span class="se">\&quot;</span><span class="s">, </span><span class="se">\&quot;</span><span class="s">items</span><span class="se">\&quot;</span><span class="s">: </span><span class="se">\&quot;</span><span class="s">person</span><span class="se">\&quot;</span><span class="s">}}&quot;</span>
+<span class="s">&quot;  ]&quot;</span>
+<span class="s">&quot;}&quot;</span>
+<span class="p">;</span>
+
+<span class="n">avro_schema_t</span>
+<span class="nf">create_person_schema</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_error_t</span>  <span class="n">error</span><span class="p">;</span>
+    <span class="n">avro_schema_t</span>  <span class="n">schema</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">avro_schema_from_json</span>
+        <span class="p">(</span><span class="n">PERSON_SCHEMA</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">PERSON_SCHEMA</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">schema</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">error</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">schema</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-4'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-4">&#182;</a>
+        </div>
+        <p>Next, you need to instantiate an <em>Avro value instance</em> that you&rsquo;ll
+copy the data into.  This also involves instantiating a particular
+<em>value implementation</em>; as mentioned above, the only implementation
+that you get out of the box is the <em>generic value implementation</em>.</p>
+
+<p>(Note that we&rsquo;re using the <a href="http://readthedocs.org/docs/libcork/en/latest/errors/#error-checking-macros">error-checking
+macros</a>
+from <a href="https://github.com/redjack/libcork">libcork</a>.)</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="kt">int</span>
+<span class="nf">create_person_value</span><span class="p">(</span><span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_schema_t</span>  <span class="n">schema</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">avro_value_iface_t</span>  <span class="o">*</span><span class="n">iface</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+    <span class="n">ep_check</span><span class="p">(</span><span class="n">schema</span> <span class="o">=</span> <span class="n">create_person_schema</span><span class="p">());</span>
+    <span class="n">ep_check</span><span class="p">(</span><span class="n">iface</span> <span class="o">=</span> <span class="n">avro_generic_class_from_schema</span><span class="p">(</span><span class="n">schema</span><span class="p">));</span>
+    <span class="n">ei_check</span><span class="p">(</span><span class="n">avro_generic_value_new</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">dest</span><span class="p">));</span>
+    <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">iface</span><span class="p">);</span>
+    <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">schema</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="nl">error:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">iface</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">avro_value_iface_decref</span><span class="p">(</span><span class="n">iface</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">schema</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">avro_schema_decref</span><span class="p">(</span><span class="n">schema</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-5'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-5">&#182;</a>
+        </div>
+        <p>Now, given an Avro value instance, and an instance of our
+application&rsquo;s data type, we can define a function that copies the
+data from the latter to the former.</p>
+
+<p>Not too bad, right?  You can then write the <code>avro_value_t</code> instance
+into an Avro data file, for example, using
+<code>avro_file_writer_append_value</code>.</p>
+
+<p>One thing to note about the <code>fill_person_value</code> function is that it
+makes a full copy of all of the data in the <code>src</code> record.  This can
+be good and bad; it&rsquo;s good because the <code>avro_value_t</code> instance can
+outlive the original <code>struct person</code> instance, if needed.  It can be
+bad, though, that we&rsquo;re doing all of this memory copying.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="kt">int</span>
+<span class="nf">fill_person_value</span><span class="p">(</span><span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span> <span class="o">*</span><span class="n">src</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_value_t</span>  <span class="n">child</span><span class="p">;</span>
+    <span class="kt">size_t</span>  <span class="n">i</span><span class="p">;</span>
+    <span class="cm">/* Field 0: first_name */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_set_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">first_name</span><span class="p">));</span>
+    <span class="cm">/* Field 1: last_name */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_set_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">last_name</span><span class="p">));</span>
+    <span class="cm">/* Field 2: age */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">age</span><span class="p">));</span>
+    <span class="cm">/* Field 3: children */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_reset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">));</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">child_count</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">avro_value_t</span>  <span class="n">element</span><span class="p">;</span>
+        <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_append</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">element</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+        <span class="n">rii_check</span><span class="p">(</span><span class="n">fill_person_value</span><span class="p">(</span><span class="o">&amp;</span><span class="n">element</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">]));</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-6'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-6">&#182;</a>
+        </div>
+        <p>If you can <strong>guarantee</strong> that the <code>struct person</code> will around for the
+entire lifetime of the <code>avro_value_t</code>, then you can save some cycles
+by <em>wrapping</em> the names instead of <em>copying</em> them.  (Boolean and
+numeric fields are always copied, since the cost of copying the value
+is the same as the cost of copying a pointer to the value.)</p>
+
+<p>This is the best we can do, performance-wise, using the generic value
+implementation.  There&rsquo;s no copying of large binary buffers, though
+we do still have the overhead of copying pointers to the buffers, the
+overhead of copying the numeric fields, and most importantly, the
+overhead of all of those <code>avro_value_*</code> function calls.  With only
+slightly more pain, we can do better than this by creating a
+<a href="custom-value-class.html">custom Avro value class</a> for our
+application data type.</p>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="kt">int</span>
+<span class="nf">fill_person_value_wrapped</span><span class="p">(</span><span class="n">avro_value_t</span> <span class="o">*</span><span class="n">dest</span><span class="p">,</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">person</span> <span class="o">*</span><span class="n">src</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">avro_value_t</span>  <span class="n">child</span><span class="p">;</span>
+    <span class="n">avro_wrapped_buffer_t</span>  <span class="n">buf</span><span class="p">;</span>
+    <span class="kt">size_t</span>  <span class="n">i</span><span class="p">;</span>
+    <span class="cm">/* Field 0: first_name */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_wrapped_buffer_new_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">buf</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">first_name</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_give_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">buf</span><span class="p">));</span>
+    <span class="cm">/* Field 1: last_name */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_wrapped_buffer_new_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">buf</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">last_name</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_give_string</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">buf</span><span class="p">));</span>
+    <span class="cm">/* Field 2: age */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">age</span><span class="p">));</span>
+    <span class="cm">/* Field 3: children */</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_get_by_index</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+    <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_reset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">));</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">child_count</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">avro_value_t</span>  <span class="n">element</span><span class="p">;</span>
+        <span class="n">rii_check</span><span class="p">(</span><span class="n">avro_value_append</span><span class="p">(</span><span class="o">&amp;</span><span class="n">child</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">element</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">));</span>
+        <span class="n">rii_check</span><span class="p">(</span><span class="n">fill_person_value</span><span class="p">(</span><span class="o">&amp;</span><span class="n">element</span><span class="p">,</span> <span class="n">src</span><span class="o">-&gt;</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">]));</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
