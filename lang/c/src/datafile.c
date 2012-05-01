@@ -355,6 +355,7 @@ static int file_read_block_count(avro_file_reader_t r)
 	int rval;
 	int64_t len;
 	const avro_encoding_t *enc = &avro_binary_encoding;
+	char sync[16];
 	check_prefix(rval, enc->read_long(r->reader, &r->blocks_total),
 		     "Cannot read file block count: ");
 	check_prefix(rval, enc->read_long(r->reader, &len),
@@ -368,12 +369,24 @@ static int file_read_block_count(avro_file_reader_t r)
 		r->current_blocklen = len;
 	}
 
+	/* Read in the compressed block content */
 	check_prefix(rval, avro_read(r->reader, r->current_blockdata, len),
 		     "Cannot read file block: ");
 
-	avro_codec_decode(r->codec, r->current_blockdata, len);
+	/* Verify the sync marker for this block */
+	check(rval, avro_read(r->reader, sync, sizeof(sync)));
+	if (memcmp(r->sync, sync, sizeof(r->sync)) != 0) {
+		/* wrong sync bytes */
+		avro_set_error("Incorrect sync bytes");
+		return EILSEQ;
+	}
 
-	avro_reader_memory_set_source(r->block_reader, (const char *) r->codec->block_data, r->codec->used_size);
+	/* Decompress the block and point our deserializer at the decompressed
+	 * content. */
+	avro_codec_decode(r->codec, r->current_blockdata, len);
+	avro_reader_memory_set_source
+	    (r->block_reader, (const char *) r->codec->block_data,
+	     r->codec->used_size);
 
 	r->blocks_read = 0;
 	return 0;
@@ -425,13 +438,8 @@ int avro_file_reader_fp(FILE *fp, const char *path, int should_close,
 
 	r->current_blockdata = NULL;
 	r->current_blocklen = 0;
-
-	rval = file_read_block_count(r);
-	if (rval) {
-		avro_reader_free(r->reader);
-		avro_freet(struct avro_file_reader_t_, r);
-		return rval;
-	}
+	r->blocks_total = 0;
+	r->blocks_read = 0;
 
 	*reader = r;
 	return rval;
@@ -561,26 +569,21 @@ int avro_file_reader_read(avro_file_reader_t r, avro_schema_t readers_schema,
 			  avro_datum_t * datum)
 {
 	int rval;
-	char sync[16];
 
 	check_param(EINVAL, r, "reader");
 	check_param(EINVAL, datum, "datum");
+
+	/* If we've exhausted the current block (or if we haven't read in any
+	 * blocks yet), try to read the next block. */
+	if (r->blocks_read == r->blocks_total) {
+		check(rval, file_read_block_count(r));
+	}
 
 	check(rval,
 	      avro_read_data(r->block_reader, r->writers_schema, readers_schema,
 			     datum));
 	r->blocks_read++;
 
-	if (r->blocks_read == r->blocks_total) {
-		check(rval, avro_read(r->reader, sync, sizeof(sync)));
-		if (memcmp(r->sync, sync, sizeof(r->sync)) != 0) {
-			/* wrong sync bytes */
-			avro_set_error("Incorrect sync bytes");
-			return EILSEQ;
-		}
-		/* For now, ignore errors (e.g. EOF) */
-		file_read_block_count(r);
-	}
 	return 0;
 }
 
@@ -588,24 +591,19 @@ int
 avro_file_reader_read_value(avro_file_reader_t r, avro_value_t *value)
 {
 	int rval;
-	char sync[16];
 
 	check_param(EINVAL, r, "reader");
 	check_param(EINVAL, value, "value");
 
+	/* If we've exhausted the current block (or if we haven't read in any
+	 * blocks yet), try to read the next block. */
+	if (r->blocks_read == r->blocks_total) {
+		check(rval, file_read_block_count(r));
+	}
+
 	check(rval, avro_value_read(r->block_reader, value));
 	r->blocks_read++;
 
-	if (r->blocks_read == r->blocks_total) {
-		check(rval, avro_read(r->reader, sync, sizeof(sync)));
-		if (memcmp(r->sync, sync, sizeof(r->sync)) != 0) {
-			/* wrong sync bytes */
-			avro_set_error("Incorrect sync bytes");
-			return EILSEQ;
-		}
-		/* For now, ignore errors (e.g. EOF) */
-		file_read_block_count(r);
-	}
 	return 0;
 }
 

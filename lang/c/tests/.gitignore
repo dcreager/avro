@@ -1,3 +1,4 @@
+*.avro
 generate_interop_data
 performance
 test_avro_data
