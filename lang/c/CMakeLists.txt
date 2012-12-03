@@ -150,8 +150,11 @@ else (LZMA_FOUND)
 endif (LZMA_FOUND)
 
 set(CODEC_LIBRARIES ${ZLIB_LIBRARIES} ${LZMA_LIBRARIES})
-set(CODEC_PKG "@ZLIB_PKG@ @LZMA_PKG@")
-
+if (APPLE)
+    set(CODEC_PKG "@LZMA_PKG@")
+else (APPLE)
+    set(CODEC_PKG "@ZLIB_PKG@ @LZMA_PKG@")
+endif (APPLE)
 
 add_subdirectory(src)
 add_subdirectory(examples)
