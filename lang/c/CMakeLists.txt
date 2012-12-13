@@ -130,7 +130,7 @@ include_directories(${AvroC_SOURCE_DIR}/jansson/src)
 
 find_package(ZLIB)
 if (ZLIB_FOUND)
-    set(ZLIB_PKG zlib)
+    set(ZLIB_PKG "")
     add_definitions(-DDEFLATE_CODEC)
     include_directories(${ZLIB_INCLUDE_DIR})
     message("Enabled deflate codec")
