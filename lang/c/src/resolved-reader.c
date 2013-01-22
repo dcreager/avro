@@ -112,19 +112,13 @@ avro_resolved_reader_set_source(avro_value_t *resolved,
 				avro_value_t *dest)
 {
 	avro_value_t  *self = (avro_value_t *) resolved->self;
-	if (self->self != NULL) {
-		avro_value_decref(self);
-	}
-	avro_value_copy_ref(self, dest);
+	*self = *dest;
 }
 
 void
 avro_resolved_reader_clear_source(avro_value_t *resolved)
 {
 	avro_value_t  *self = (avro_value_t *) resolved->self;
-	if (self->self != NULL) {
-		avro_value_decref(self);
-	}
 	self->iface = NULL;
 	self->self = NULL;
 }
@@ -166,12 +160,8 @@ avro_resolved_reader_free_value(const avro_value_iface_t *viface, void *vself)
 {
 	avro_resolved_reader_t  *iface =
 	    container_of(viface, avro_resolved_reader_t, parent);
-	avro_value_t  *self = (avro_value_t *) vself;
 
 	avro_resolved_reader_done(iface, vself);
-	if (self->self != NULL) {
-		avro_value_decref(self);
-	}
 
 	vself = (char *) vself - sizeof(volatile int);
 	avro_free(vself, iface->instance_size + sizeof(volatile int));
