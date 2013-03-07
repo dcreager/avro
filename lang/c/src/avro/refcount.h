@@ -30,6 +30,12 @@ extern "C" {
 #define CLOSE_EXTERN
 #endif
 
+#if __tilegx__ || __tilepro__
+#define GCC_VER  40100
+#else
+#define GCC_VER  40500
+#endif
+
 /**
  * Atomically sets the value of a reference count.
  */
@@ -118,7 +124,7 @@ avro_refcount_dec(volatile int *refcount)
  * GCC intrinsics
  */
 
-#elif (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) > 40500
+#elif (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) > GCC_VER
 
 static inline void
 avro_refcount_set(volatile int *refcount, int value)

@@ -58,3 +58,7 @@ add_avro_test(test_avro_data)
 add_avro_test(test_empty_file)
 add_avro_test(test_refcount)
 add_avro_test(test_cpp test_cpp.cpp)
+
+if(TILERA)
+    configure_file(tile-test ${CMAKE_BINARY_DIR}/tile-test COPYONLY)
+endif(TILERA)
