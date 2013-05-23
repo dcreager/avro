@@ -1,3 +1,3 @@
 name: avro
-source_path: lang/c
+source_dir: lang/c
 license: Apache
