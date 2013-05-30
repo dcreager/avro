@@ -86,10 +86,13 @@ endif(UNIX)
 include(CPackConfig.txt)
 include(CheckLibraryExists)
 
+set(CMAKE_INSTALL_LIBDIR lib CACHE STRING
+    "The base name of the installation directory for libraries")
 
 if(APPLE)
     if (NOT CMAKE_INSTALL_NAME_DIR)
-        set(CMAKE_INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+        set(CMAKE_INSTALL_NAME_DIR
+            "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
     endif (NOT CMAKE_INSTALL_NAME_DIR)
 endif(APPLE)
 

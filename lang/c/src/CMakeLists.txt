@@ -125,8 +125,8 @@ install(DIRECTORY
 if (WIN32)
 install(TARGETS avro-static
         RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
        )
 else(WIN32)
 install(TARGETS avro-static avro-shared
@@ -140,9 +140,9 @@ endif(WIN32)
 
 set(prefix ${CMAKE_INSTALL_PREFIX})
 set(VERSION ${AVRO_VERSION})
-configure_file(avro-c.pc.in avro-c.pc)
+configure_file(avro-c.pc.in ${CMAKE_CURRENT_BINARY_DIR}/avro-c.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/avro-c.pc
-        DESTINATION lib/pkgconfig)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 add_executable(avrocat avrocat.c)
 target_link_libraries(avrocat avro-static)
