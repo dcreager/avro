@@ -1,3 +1,6 @@
 name: avro
 source_dir: lang/c
 license: Apache
+dependencies:
+  - zlib
+  - xz
