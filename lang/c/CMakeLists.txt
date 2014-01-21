@@ -145,11 +145,9 @@ endif (ZLIB_FOUND)
 
 find_package(Snappy)
 if (SNAPPY_FOUND AND ZLIB_FOUND)  # Snappy borrows crc32 from zlib
-    set(SNAPPY_PKG libsnappy)
     add_definitions(-DSNAPPY_CODEC)
     message("Enabled snappy codec")
 else (SNAPPY_FOUND AND ZLIB_FOUND)
-    set(SNAPPY_PKG "")
     set(SNAPPY_LIBRARIES "")
     message("Disabled snappy codec. libsnappy not found or zlib not found.")
 endif (SNAPPY_FOUND AND ZLIB_FOUND)
@@ -169,7 +167,7 @@ else (LZMA_FOUND)
 endif (LZMA_FOUND)
 
 set(CODEC_LIBRARIES ${ZLIB_LIBRARIES} ${LZMA_LIBRARIES} ${SNAPPY_LIBRARIES})
-set(CODEC_PKG "@ZLIB_PKG@ @LZMA_PKG@ @SNAPPY_PKG@")
+set(CODEC_PKG "@ZLIB_PKG@ @LZMA_PKG@")
 
 
 add_subdirectory(src)
