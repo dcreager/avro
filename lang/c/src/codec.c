@@ -16,11 +16,18 @@
  */
 
 #include <string.h>
+#include <sys/param.h>
 #ifdef SNAPPY_CODEC
 #include <snappy-c.h>
 #  if defined(__APPLE__)
 #    include <libkern/OSByteOrder.h>
 #    define __bswap_32 OSSwapInt32
+#  elif defined(BSD)
+#    include <sys/types.h>
+#    include <sys/endian.h>
+#    define __bswap_16  bswap16
+#    define __bswap_32  bswap32
+#    define __bswap_64  bswap64
 #  else
 #    include <byteswap.h>
 #  endif
