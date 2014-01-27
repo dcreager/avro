@@ -101,17 +101,6 @@ int main(void)
 	/* Then read from the truncated file. */
 
 	check_exit(avro_file_reader("avro-1238-truncated.avro", &reader));
-
-	check_exit(avro_file_reader_read_value(reader, &actual));
-	check_exit(avro_value_set_branch(&expected, 0, &branch));
-	check_exit(avro_value_set_null(&branch));
-	check_expected_value(&actual, &expected);
-
-	check_exit(avro_file_reader_read_value(reader, &actual));
-	check_exit(avro_value_set_branch(&expected, 1, &branch));
-	check_exit(avro_value_set_int(&branch, 100));
-	check_expected_value(&actual, &expected);
-
 	expect_error(avro_file_reader_read_value(reader, &actual));
 	check_exit(avro_file_reader_close(reader));
 
