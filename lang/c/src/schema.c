@@ -76,6 +76,9 @@ static int record_free_foreach(int i, struct avro_record_field_t *field,
 
 	avro_str_free(field->name);
 	avro_schema_decref(field->type);
+	if (field->default_value != NULL) {
+		json_decref(field->default_value);
+	}
 	avro_freet(struct avro_record_field_t, field);
 	return ST_DELETE;
 }
@@ -520,15 +523,62 @@ avro_schema_enum_symbol_append(const avro_schema_t enum_schema,
 	return 0;
 }
 
-int
-avro_schema_record_field_append(const avro_schema_t record_schema,
-				const char *field_name,
-				const avro_schema_t field_schema)
+static bool
+is_equal_schema_type(const avro_schema_t field_schema, const json_t *field_default)
+{
+	int  json_type = json_typeof(field_default);
+
+	switch (avro_typeof(field_schema)) {
+	case AVRO_STRING:
+	case AVRO_BYTES:
+		return json_type == JSON_STRING;
+
+	case AVRO_INT32:
+	case AVRO_INT64:
+		return json_type == JSON_INTEGER;
+
+	case AVRO_FLOAT:
+	case AVRO_DOUBLE:
+		return json_type == JSON_REAL;
+
+	case AVRO_BOOLEAN:
+		return (json_type == JSON_TRUE) || (json_type == JSON_FALSE);
+
+	case AVRO_NULL:
+		return json_type == JSON_NULL;
+
+	case AVRO_ARRAY:
+		return json_type == JSON_ARRAY;
+
+	case AVRO_RECORD:
+	case AVRO_ENUM:
+	case AVRO_FIXED:
+	case AVRO_MAP:
+	case AVRO_UNION:
+	case AVRO_LINK:
+		return json_type == JSON_OBJECT;
+	}
+	return false;
+}
+
+static int
+avro_schema_record_field_append_with_default_json(const avro_schema_t record_schema,
+                                                  const char *field_name,
+                                                  const avro_schema_t field_schema,
+                                                  const json_t *field_default)
 {
 	check_param(EINVAL, is_avro_schema(record_schema), "record schema");
 	check_param(EINVAL, is_avro_record(record_schema), "record schema");
 	check_param(EINVAL, field_name, "field name");
 	check_param(EINVAL, is_avro_schema(field_schema), "field schema");
+
+	if (field_default != NULL) {
+		check_param(EINVAL, field_default, "field_default");
+		if (!is_equal_schema_type(field_schema, field_default)) {
+			avro_set_error("Default value type is not equal to schema type");
+			return EINVAL;
+		}
+	}
 
 	if (!is_avro_id(field_name)) {
 		avro_set_error("Invalid Avro identifier");
@@ -549,11 +599,51 @@ avro_schema_record_field_append(const avro_schema_t record_schema,
 	new_field->index = record->fields->num_entries;
 	new_field->name = avro_strdup(field_name);
 	new_field->type = avro_schema_incref(field_schema);
+	if (field_default != NULL) {
+		new_field->default_value = json_incref((json_t *) field_default);
+	} else {
+		new_field->default_value = NULL;
+	}
+
 	st_insert(record->fields, record->fields->num_entries,
 		  (st_data_t) new_field);
 	st_insert(record->fields_byname, (st_data_t) new_field->name,
 		  (st_data_t) new_field);
+	if (field_default != NULL) {
+		st_insert(record->fields_byname, (st_data_t) new_field->default_value,
+			  (st_data_t) new_field);
+	}
+
 	return 0;
+}
+
+int
+avro_schema_record_field_append(const avro_schema_t record_schema,
+				const char *field_name,
+				const avro_schema_t field_schema)
+{
+	return avro_schema_record_field_append_with_default_json(record_schema,
+								 field_name,
+								 field_schema,
+								 NULL);
+}
+
+int
+avro_schema_record_field_append_with_default(const avro_schema_t record_schema,
+					     const char *field_name,
+					     const avro_schema_t field_schema,
+					     const char *field_default)
+{
+	json_error_t  *error;
+	json_t	*field_default_json = json_loads(field_default, 0, error);
+	if (field_default_json == NULL) {
+		avro_set_error(error->text);
+		return EINVAL;
+	}
+	return avro_schema_record_field_append_with_default_json(record_schema,
+								 field_name,
+								 field_schema,
+								 field_default_json);
 }
 
 avro_schema_t avro_schema_record(const char *name, const char *space)
@@ -890,6 +980,7 @@ avro_schema_from_json_t(json_t *json, avro_schema_t *schema,
 				    json_array_get(json_fields, i);
 				json_t *json_field_name;
 				json_t *json_field_type;
+				json_t *json_field_default;
 				avro_schema_t json_field_type_schema;
 				int field_rval;
 
@@ -920,11 +1011,23 @@ avro_schema_from_json_t(json_t *json, avro_schema_t *schema,
 					avro_schema_decref(*schema);
 					return field_rval;
 				}
-				field_rval =
-				    avro_schema_record_field_append(*schema,
-								    json_string_value
-								    (json_field_name),
-								    json_field_type_schema);
+				json_field_default =
+					json_object_get(json_field, "default");
+
+				if (!json_field_default) {
+					field_rval =
+					    avro_schema_record_field_append(*schema,
+									    json_string_value
+									    (json_field_name),
+									    json_field_type_schema);
+				} else {
+					field_rval =
+					    avro_schema_record_field_append_with_default_json(*schema,
+											      json_string_value
+											      (json_field_name),
+											      json_field_type_schema,
+											      json_field_default);
+				}
 				avro_schema_decref(json_field_type_schema);
 				if (field_rval != 0) {
 					avro_schema_decref(*schema);
@@ -1517,6 +1620,10 @@ static int write_field(avro_writer_t out, const struct avro_record_field_t *fiel
 	check(rval, avro_write_str(out, field->name));
 	check(rval, avro_write_str(out, "\",\"type\":"));
 	check(rval, avro_schema_to_json2(field->type, out, parent_namespace));
+	if (field->default_value != NULL) {
+		check(rval, avro_write_str(out, ",\"default\":"));
+		check(rval, avro_write_str(out, json_dumps(field->default_value, JSON_ENCODE_ANY)));
+	}
 	return avro_write_str(out, "}");
 }
 
