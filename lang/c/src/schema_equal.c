@@ -50,7 +50,7 @@ schema_record_equal(struct avro_record_schema_t *a,
 		}
 		if (!avro_schema_equal(fa.f->type, fb.f->type)) {
 			/*
-			 * They have fields with different schemas 
+			 * They have fields with different schemas
 			 */
 			return 0;
 		}

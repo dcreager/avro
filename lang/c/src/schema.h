@@ -21,15 +21,14 @@
 #include "avro/basics.h"
 #include "avro/schema.h"
 #include "avro_private.h"
+#include "jansson.h"
 #include "st.h"
 
 struct avro_record_field_t {
 	int index;
 	char *name;
 	avro_schema_t type;
-	/*
-	 * TODO: default values 
-	 */
+	json_t	*default_value;
 };
 
 struct avro_record_schema_t {

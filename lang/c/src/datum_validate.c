@@ -166,9 +166,6 @@ avro_schema_datum_validate(avro_schema_t expected_schema, avro_datum_t datum)
 				    avro_record_get(datum, val.field->name,
 						    &field_datum);
 				if (rval) {
-					/*
-					 * TODO: check for default values 
-					 */
 					return rval;
 				}
 				if (!avro_schema_datum_validate
